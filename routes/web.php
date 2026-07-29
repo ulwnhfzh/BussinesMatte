@@ -6,6 +6,12 @@ use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\InventoryController; // <--- PERUBAHAN DISINI (Path foldernya)
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AICopilotController;
+use App\Http\Controllers\POSCashierController;
+use App\Http\Controllers\PengaturanController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -65,4 +71,67 @@ Route::middleware('auth')->group(function () {
     // ================================
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory');
     Route::get('/inventory/{id}', [InventoryController::class, 'show'])->name('inventory.detail');
+
+    
+
+    Route::middleware('auth')->group(function () {
+    Route::get('/inventory', [ProductController::class, 'index'])->name('inventory');
+    Route::post('/inventory', [ProductController::class, 'store'])->name('inventory.store');
+
+
+    Route::middleware('auth')->group(function () {
+
+    Route::get('/inventory', [ProductController::class, 'index'])->name('inventory');
+
+    Route::post('/inventory', [ProductController::class, 'store'])->name('inventory.store');
+
+    Route::get('/inventory/{id}', [ProductController::class, 'show'])->name('inventory.detail');
+
+    Route::put('/inventory/{id}', [ProductController::class, 'update'])->name('inventory.update');
+
+    Route::delete('/inventory/{id}', [ProductController::class, 'destroy'])->name('inventory.destroy');
+
 });
+
+
+});
+// ================================
+    // C. ANALYTICS
+    // ================================
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
+    Route::get('/analytics/chart-data', [AnalyticsController::class, 'getChartData'])->name('analytics.chart');
+
+    // ================================
+    // D. AI COPILOT
+    // ================================
+    Route::get('/ai-copilot', [AICopilotController::class, 'index'])->name('ai.copilot');
+
+    // ================================
+    // E. POS CASHIER
+    // ================================
+    Route::get('/pos-cashier', [POSCashierController::class, 'index'])->name('pos.cashier');
+    Route::post('/pos/add', [POSCashierController::class, 'addToCart'])->name('pos.add');
+    Route::post('/pos/update', [POSCashierController::class, 'updateCart'])->name('pos.update');
+    Route::delete('/pos/remove/{id}', [POSCashierController::class, 'removeFromCart'])->name('pos.remove');
+    Route::post('/pos/clear', [POSCashierController::class, 'clearCart'])->name('pos.clear');
+    Route::post('/pos/checkout', [POSCashierController::class, 'checkout'])->name('pos.checkout');
+    Route::post('/pos/save', [POSCashierController::class, 'saveTransaction'])->name('pos.save');
+
+    // ================================
+    // F. PENGATURAN
+    // ================================
+    Route::get('/pengaturan', [PengaturanController::class, 'index'])->name('pengaturan');
+    Route::put('/pengaturan/update', [PengaturanController::class, 'updateProfile'])->name('pengaturan.update');
+    Route::put('/pengaturan/password', [PengaturanController::class, 'updatePassword'])->name('pengaturan.password');
+
+    // ================================
+    // E. POS CASHIER (LENGKAP)
+    // ================================
+    Route::get('/pos-cashier', [POSCashierController::class, 'index'])->name('pos.cashier');
+    Route::post('/pos/add', [POSCashierController::class, 'addToCart'])->name('pos.add');
+    Route::post('/pos/update', [POSCashierController::class, 'updateCart'])->name('pos.update');
+    Route::delete('/pos/remove/{id}', [POSCashierController::class, 'removeFromCart'])->name('pos.remove');
+    Route::post('/pos/clear', [POSCashierController::class, 'clearCart'])->name('pos.clear');
+    Route::post('/pos/checkout', [POSCashierController::class, 'checkout'])->name('pos.checkout');
+    Route::post('/pos/save', [POSCashierController::class, 'saveTransaction'])->name('pos.save');
+    });

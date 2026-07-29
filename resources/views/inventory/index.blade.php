@@ -17,6 +17,9 @@
                 <p class="text-sm text-gray-500 mt-1">Kelola tingkat stok Anda dan pantau kesehatan produk secara real-time.</p>
             </div>
             <div class="flex gap-2">
+                <button onclick="openModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition">
+                    + Tambah Barang
+                </button>
                 <button class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2 transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
                     Filter
@@ -56,12 +59,23 @@
                             <!-- Nama Produk -->
                             <td class="px-6 py-5 whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-12 w-12 bg-gray-200 rounded-lg overflow-hidden flex items-center justify-center text-lg">
-                                        📦
-                                    </div>
+                                    <div class="flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+
+    @if($product->image)
+        <img
+            src="{{ asset('storage/products/' . $product->image) }}"
+            alt="{{ $product->name }}"
+            class="w-full h-full object-cover">
+    @else
+        <div class="w-full h-full flex items-center justify-center text-lg">
+            📦
+        </div>
+    @endif
+
+</div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-semibold text-gray-900">{{ $product['name'] }}</div>
-                                        <div class="text-xs text-gray-400">SKU: {{ $product['sku'] }}</div>
+                                        <div class="text-sm font-semibold text-gray-900">{{ $product->name }}</div>
+                                        <div class="text-xs text-gray-400">SKU: {{ $product->product_code }}</div>
                                     </div>
                                 </div>
                             </td>
@@ -69,24 +83,24 @@
                             <td class="px-6 py-5 whitespace-nowrap">
                                 <div class="flex flex-col">
                                     <div class="text-xs text-gray-900 font-medium mb-1">
-                                        Kapasitas <span class="text-blue-600">{{ $product['capacity'] }}</span> / {{ $product['max_capacity'] }}
+                                        Kapasitas <span class="text-blue-600">{{ $product->stock }}</span> / {{ max($product->stock,1) }}
                                     </div>
                                     <!-- Progress Bar -->
                                     <div class="w-24 h-1.5 bg-gray-200 rounded-full">
-                                        <div class="h-1.5 rounded-full {{ $product['status'] == 'kritis' ? 'bg-red-500' : 'bg-blue-600' }}" 
-                                             style="width: {{ ($product['capacity'] / $product['max_capacity']) * 100 }}%"></div>
+                                        <div class="h-1.5 rounded-full {{ $product->status == 'kritis' ? 'bg-red-500' : 'bg-blue-600' }}" 
+                                             style="width: {{ ($product->stock / max($product->stock,1)) * 100 }}%"></div>
                                     </div>
                                 </div>
                             </td>
                             <!-- Ambang Batas -->
                             <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">
-                                {{ $product['stock'] }} Unit
+                                {{ $product->minimum_stock }} Unit
                             </td>
                             <!-- Status -->
                             <td class="px-6 py-5 whitespace-nowrap text-center">
-                                @if($product['status'] == 'optimal')
+                                @if($product->status == 'optimal')
                                     <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Optimal</span>
-                                @elseif($product['status'] == 'kritis')
+                                @elseif($product->status == 'kritis')
                                     <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-red-100 text-red-700 border border-red-200">Kritis</span>
                                 @else
                                     <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200">Peringatan</span>
@@ -177,4 +191,31 @@
 
     </div>
 </div>
+
+<div id="productModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+<div class="bg-white rounded-2xl w-full max-w-2xl p-6">
+<h2 class="text-xl font-bold mb-6">Tambah Barang</h2>
+<form action="{{ route('inventory.store') }}" method="POST" enctype="multipart/form-data">
+@csrf
+<div class="grid grid-cols-2 gap-4">
+<input type="text" name="product_code" placeholder="Kode Barang" class="border rounded-lg p-2">
+<input type="text" name="name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
+<input type="text" name="category" placeholder="Kategori" class="border rounded-lg p-2">
+<input type="text" name="unit" value="Pcs" class="border rounded-lg p-2">
+<input type="number" name="purchase_price" placeholder="Harga Beli" class="border rounded-lg p-2">
+<input type="number" name="selling_price" placeholder="Harga Jual" class="border rounded-lg p-2">
+<input type="number" name="stock" placeholder="Stok" class="border rounded-lg p-2">
+<input type="number" name="minimum_stock" value="10" class="border rounded-lg p-2">
+<div class="col-span-2"><input type="file" name="image" class="border rounded-lg p-2 w-full"></div>
+<div class="col-span-2"><textarea name="description" class="border rounded-lg p-2 w-full" placeholder="Deskripsi"></textarea></div>
+</div>
+<div class="flex justify-end gap-2 mt-6">
+<button type="button" onclick="closeModal()" class="border px-4 py-2 rounded-lg">Batal</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded-lg">Simpan Barang</button>
+</div></form></div></div>
+<script>
+function openModal(){const m=document.getElementById('productModal');m.classList.remove('hidden');m.classList.add('flex');}
+function closeModal(){const m=document.getElementById('productModal');m.classList.remove('flex');m.classList.add('hidden');}
+</script>
+
 @endsection

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Business;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class RegisterController extends Controller
 {
@@ -25,15 +27,37 @@ class RegisterController extends Controller
             'terms' => 'accepted',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'business_name' => $request->business_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        DB::beginTransaction();
 
-        Auth::login($user);
+        try {
 
-        return redirect('/dashboard')->with('success', 'Akun berhasil dibuat!');
+            // Membuat data bisnis
+            $business = Business::create([
+                'name' => $request->business_name,
+            ]);
+
+            // Membuat user owner
+            $user = User::create([
+                'business_id' => $business->id,
+                'name'        => $request->name,
+                'email'       => $request->email,
+                'password'    => Hash::make($request->password),
+            ]);
+
+            DB::commit();
+
+            Auth::login($user);
+
+            return redirect('/dashboard')
+                ->with('success', 'Akun berhasil dibuat!');
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            return back()
+                ->withInput()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 }
