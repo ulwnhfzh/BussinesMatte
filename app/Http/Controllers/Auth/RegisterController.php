@@ -30,7 +30,6 @@ class RegisterController extends Controller
         DB::beginTransaction();
 
         try {
-
             // Membuat data bisnis
             $business = Business::create([
                 'name' => $request->business_name,
@@ -46,10 +45,12 @@ class RegisterController extends Controller
 
             DB::commit();
 
-            Auth::login($user);
+            // ❌ Auth::login($user); <-- KITA HAPUS BARIS INI (agar tidak otomatis tersimpan sesi login)
 
-            return redirect('/dashboard')
-                ->with('success', 'Akun berhasil dibuat!');
+            // Redirect ke route login
+            return redirect()
+                ->route('login')
+                ->with('success', 'Akun berhasil dibuat! Silakan login untuk melanjutkan.');
 
         } catch (\Exception $e) {
 

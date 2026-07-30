@@ -2,125 +2,93 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Product;
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class POSCashierController extends Controller
 {
     /**
-     * Data dummy produk
-     * Silakan edit, tambah, atau hapus sesuai kebutuhan
+     * Halaman Utama POS Cashier
      */
-    private function getProducts()
-    {
-        return [
-            [
-                'id' => 1,
-                'name' => 'Espresso Maker Pro',
-                'category' => 'Elektronik',
-                'price' => 2450000,
-                'stock' => 12,
-                'image' => 'https://via.placeholder.com/80x80/2563eb/ffffff?text=EM'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Sourdough Artisanal',
-                'category' => 'Makanan',
-                'price' => 110000,
-                'stock' => 45,
-                'image' => 'https://via.placeholder.com/80x80/e67e22/ffffff?text=SA'
-            ],
-            [
-                'id' => 3,
-                'name' => 'Glass Water Bottle',
-                'category' => 'Aksesoris',
-                'price' => 120000,
-                'stock' => 156,
-                'image' => 'https://via.placeholder.com/80x80/2ecc71/ffffff?text=GW'
-            ],
-            [
-                'id' => 4,
-                'name' => 'Matcha Powder Premium',
-                'category' => 'Minuman',
-                'price' => 185000,
-                'stock' => 30,
-                'image' => 'https://via.placeholder.com/80x80/27ae60/ffffff?text=MP'
-            ],
-            [
-                'id' => 5,
-                'name' => 'Wireless Headset Pro',
-                'category' => 'Elektronik',
-                'price' => 99000,
-                'stock' => 8,
-                'image' => 'https://via.placeholder.com/80x80/8e44ad/ffffff?text=WH'
-            ],
-            [
-                'id' => 6,
-                'name' => 'Luxury Truffle Box',
-                'category' => 'Makanan',
-                'price' => 320000,
-                'stock' => 22,
-                'image' => 'https://via.placeholder.com/80x80/c0392b/ffffff?text=LT'
-            ],
-        ];
-    }
-
     public function index()
     {
-        $products = $this->getProducts();
+        $businessId = Auth::user()->business_id;
+
+        // Ambil produk riil dari database milik business yang login
+        $products = Product::where('business_id', $businessId)->get();
+
         $cart = Session::get('cart', []);
-        
-        // Hitung total
+
+        // Hitung Subtotal Keranjang
         $subtotal = 0;
         foreach ($cart as $item) {
             $subtotal += $item['price'] * $item['quantity'];
         }
+
+        // Kalkulasi Tambahan (Bisa disesuaikan nanti)
         $tax = $subtotal * 0.11; // Pajak 11%
-        $discount = 50000; // Diskon member fixed
+        $discount = 0; // Diskon default
         $total = $subtotal + $tax - $discount;
 
         return view('pos-cashier.index', compact('products', 'cart', 'subtotal', 'tax', 'discount', 'total'));
     }
 
+    /**
+     * Tambah Produk ke Keranjang
+     */
     public function addToCart(Request $request)
     {
         $productId = $request->product_id;
         $quantity = $request->quantity ?? 1;
         $note = $request->note ?? '';
 
-        // Ambil data produk dari dummy
-        $products = $this->getProducts();
-        $product = collect($products)->firstWhere('id', $productId);
+        // Ambil produk dari database
+        $product = Product::where('business_id', Auth::user()->business_id)
+            ->findOrFail($productId);
 
-        if (!$product) {
-            return response()->json(['error' => 'Produk tidak ditemukan'], 404);
+        // Cek ketersediaan stok
+        if ($product->stock < $quantity) {
+            return back()->with('error', 'Stok produk tidak mencukupi!');
         }
 
         $cart = Session::get('cart', []);
 
         if (isset($cart[$productId])) {
-            // Update quantity jika sudah ada
-            $cart[$productId]['quantity'] += $quantity;
+            $newQuantity = $cart[$productId]['quantity'] + $quantity;
+
+            if ($product->stock < $newQuantity) {
+                return back()->with('error', 'Stok tidak mencukupi untuk penambahan ini!');
+            }
+
+            $cart[$productId]['quantity'] = $newQuantity;
             if ($note) {
                 $cart[$productId]['note'] = $note;
             }
         } else {
-            // Tambah baru
             $cart[$productId] = [
-                'id' => $product['id'],
-                'name' => $product['name'],
-                'price' => $product['price'],
+                'id' => $product->id,
+                'name' => $product->name,
+                'price' => $product->selling_price,
+                'purchase_price' => $product->purchase_price, // Disimpan untuk kalkulasi laba nanti
                 'quantity' => $quantity,
-                'image' => $product['image'],
+                'image' => $product->image ? asset('storage/products/' . $product->image) : null,
                 'note' => $note
             ];
         }
 
         Session::put('cart', $cart);
 
-        return redirect()->route('pos.cashier')->with('success', 'Produk ditambahkan ke keranjang!');
+        return redirect()->route('pos.cashier')->with('success', 'Produk masuk ke keranjang!');
     }
 
+    /**
+     * Update Jumlah Item di Keranjang
+     */
     public function updateCart(Request $request)
     {
         $productId = $request->product_id;
@@ -133,6 +101,11 @@ class POSCashierController extends Controller
             if ($quantity <= 0) {
                 unset($cart[$productId]);
             } else {
+                $product = Product::where('business_id', Auth::user()->business_id)->find($productId);
+                if ($product && $product->stock < $quantity) {
+                    return back()->with('error', 'Jumlah melebihi stok yang tersedia!');
+                }
+
                 $cart[$productId]['quantity'] = $quantity;
                 $cart[$productId]['note'] = $note;
             }
@@ -142,6 +115,9 @@ class POSCashierController extends Controller
         return redirect()->route('pos.cashier')->with('success', 'Keranjang diperbarui!');
     }
 
+    /**
+     * Hapus 1 Item dari Keranjang
+     */
     public function removeFromCart($id)
     {
         $cart = Session::get('cart', []);
@@ -153,26 +129,90 @@ class POSCashierController extends Controller
         return redirect()->route('pos.cashier')->with('success', 'Item dihapus dari keranjang!');
     }
 
+    /**
+     * Kosongkan Keranjang
+     */
     public function clearCart()
     {
         Session::forget('cart');
         return redirect()->route('pos.cashier')->with('success', 'Keranjang dikosongkan!');
     }
 
+    /**
+     * Process Checkout & Simpan Transaksi Ke Database
+     */
     public function checkout(Request $request)
     {
         $cart = Session::get('cart', []);
-        
+
         if (empty($cart)) {
-            return redirect()->route('pos.cashier')->with('error', 'Keranjang kosong!');
+            return redirect()->route('pos.cashier')->with('error', 'Keranjang belanja masih kosong!');
         }
 
-        // Simulasi penyimpanan transaksi
-        $transactionId = 'TRX-' . date('Ymd') . '-' . rand(1000, 9999);
-        
-        // Kosongkan keranjang setelah checkout
-        Session::forget('cart');
+        $user = Auth::user();
 
-        return redirect()->route('pos.cashier')->with('success', 'Transaksi ' . $transactionId . ' berhasil!');
+        DB::beginTransaction();
+
+        try {
+            // 1. Hitung total amount dan modal/HPP
+            $subtotal = 0;
+            $totalCost = 0;
+
+            foreach ($cart as $item) {
+                $subtotal += $item['price'] * $item['quantity'];
+                $totalCost += ($item['purchase_price'] ?? 0) * $item['quantity'];
+            }
+
+            $tax = $subtotal * 0.11;
+            $discount = 0;
+            $totalAmount = $subtotal + $tax - $discount;
+            $totalProfit = $totalAmount - $totalCost; // Profit bersih
+
+            // 2. Buat Record Transaksi Utama
+            $invoiceNumber = 'TRX-' . date('Ymd') . '-' . rand(1000, 9999);
+
+            $transaction = Transaction::create([
+                'business_id'    => $user->business_id,
+                'user_id'        => $user->id,
+                'invoice_number' => $invoiceNumber,
+                'subtotal'       => $subtotal,
+                'tax'            => $tax,
+                'discount'       => $discount,
+                'total_amount'   => $totalAmount,
+                'total_cost'     => $totalCost,
+                'total_profit'   => $totalProfit,
+                'payment_method' => $request->payment_method ?? 'cash',
+            ]);
+
+            // 3. Simpan Detail Transaksi & Potong Stok Produk
+            foreach ($cart as $productId => $item) {
+                TransactionDetail::create([
+                    'transaction_id' => $transaction->id,
+                    'product_id'     => $productId,
+                    'quantity'       => $item['quantity'],
+                    'purchase_price' => $item['purchase_price'] ?? 0,
+                    'selling_price'  => $item['price'],
+                    'subtotal'       => $item['price'] * $item['quantity'],
+                    'note'           => $item['note'] ?? null,
+                ]);
+
+                // Potong stok di tabel products
+                $product = Product::find($productId);
+                if ($product) {
+                    $product->decrement('stock', $item['quantity']);
+                }
+            }
+
+            DB::commit();
+
+            // Dikosongkan keranjang setelah checkout berhasil
+            Session::forget('cart');
+
+            return redirect()->route('pos.cashier')->with('success', 'Transaksi ' . $invoiceNumber . ' Berhasil Disimpan!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->route('pos.cashier')->with('error', 'Gagal memproses transaksi: ' . $e->getMessage());
+        }
     }
 }
