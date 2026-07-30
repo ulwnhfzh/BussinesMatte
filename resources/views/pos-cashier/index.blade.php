@@ -214,7 +214,7 @@
     @csrf
 </form>
 
-<form id="saveForm" method="POST" action="{{ route('pos.save') }}" style="display:none;">
+<form id="saveForm" method="POST" action="{{ route('pos.checkout') }}" style="display:none;">
     @csrf
 </form>
 
