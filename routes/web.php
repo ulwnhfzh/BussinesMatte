@@ -69,7 +69,7 @@ Route::middleware('auth')->group(function () {
     // ================================
     Route::get('/inventory', [ProductController::class, 'index'])->name('inventory');
     Route::post('/inventory', [ProductController::class, 'store'])->name('inventory.store');
-    Route::get('/inventory/{id}/edit', [ProductController::class, 'edit'])->name('inventory.edit');
+    Route::get('/inventory/{id}/edit', [ProductController::class, 'edit'])->name('inventory.edit'); // <-- TAMBAHKAN INI
     Route::get('/inventory/{id}', [ProductController::class, 'show'])->name('inventory.detail');
     Route::put('/inventory/{id}', [ProductController::class, 'update'])->name('inventory.update');
     Route::delete('/inventory/{id}', [ProductController::class, 'destroy'])->name('inventory.destroy');
@@ -94,6 +94,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/pos/remove/{id}', [POSCashierController::class, 'removeFromCart'])->name('pos.remove');
     Route::post('/pos/clear', [POSCashierController::class, 'clearCart'])->name('pos.clear');
     Route::post('/pos/checkout', [POSCashierController::class, 'checkout'])->name('pos.checkout');
+    Route::post('/pos/save', [POSCashierController::class, 'checkout'])->name('pos.save');
 
     // ================================
     // F. PENGATURAN
@@ -101,5 +102,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/pengaturan', [PengaturanController::class, 'index'])->name('pengaturan');
     Route::put('/pengaturan/update', [PengaturanController::class, 'updateProfile'])->name('pengaturan.update');
     Route::put('/pengaturan/password', [PengaturanController::class, 'updatePassword'])->name('pengaturan.password');
+
+
+    // ================================
+    // G. GENERATE KODE BARANG (AJAX)
+    // ================================
+    Route::get('/inventory/generate-code', [ProductController::class, 'generateCodeAjax'])->name('inventory.generate');
 
 });

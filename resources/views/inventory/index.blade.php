@@ -262,29 +262,42 @@
         <form action="{{ route('inventory.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div class="grid grid-cols-2 gap-4">
-                <!-- Kode Barang dengan auto-generate -->
-                <div class="relative">
-                    <input type="text" name="product_code" id="product_code" placeholder="Kode Barang" class="border rounded-lg p-2 w-full" required>
-                    <button type="button" onclick="generateCode()" class="absolute right-2 top-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" title="Generate ulang kode">
-                        ↻
-                    </button>
-                </div>
-                <input type="text" name="name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
-                <input type="text" name="category" placeholder="Kategori" class="border rounded-lg p-2">
-                <input type="text" name="unit" value="Pcs" class="border rounded-lg p-2">
-                <input type="number" name="purchase_price" placeholder="Harga Beli" class="border rounded-lg p-2" required>
-                <input type="number" name="selling_price" placeholder="Harga Jual" class="border rounded-lg p-2" required>
-                <input type="number" name="stock" placeholder="Stok" class="border rounded-lg p-2" required>
-                <input type="number" name="minimum_stock" placeholder="Stok Minimum" class="border rounded-lg p-2" value="10" required>
-                <input type="number" name="maximum_stock" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
-                <div class="col-span-2">
-                    <input type="file" name="image" class="border rounded-lg p-2 w-full">
-                    <p class="text-xs text-gray-500 mt-1">Ukuran maksimal 2MB (jpg, jpeg, png, webp)</p>
-                </div>
-                <div class="col-span-2">
-                    <textarea name="description" class="border rounded-lg p-2 w-full" placeholder="Deskripsi (opsional)"></textarea>
-                </div>
-            </div>
+    <!-- Kode Barang dengan auto-generate -->
+    <div class="relative">
+        <input type="text" name="product_code" id="product_code" placeholder="Kode Barang" class="border rounded-lg p-2 w-full" required>
+        <button type="button" onclick="generateCode()" class="absolute right-2 top-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" title="Generate ulang kode">
+            ↻
+        </button>
+        </div>
+        <input type="text" name="name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
+        <input type="text" name="category" placeholder="Kategori" class="border rounded-lg p-2">
+        <input type="text" name="unit" value="Pcs" class="border rounded-lg p-2">
+        
+        <!-- HARGA BELI (Disesuaikan) -->
+        <div class="relative flex items-center">
+            <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
+            <input type="text" id="purchase_price_display" placeholder="Harga Beli" class="border rounded-lg p-2 pl-10 w-full" onkeyup="formatRupiahInput(this, 'purchase_price')" required>
+            <input type="hidden" name="purchase_price" id="purchase_price" required>
+        </div>
+
+        <!-- HARGA JUAL (Disesuaikan) -->
+        <div class="relative flex items-center">
+            <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
+            <input type="text" id="selling_price_display" placeholder="Harga Jual" class="border rounded-lg p-2 pl-10 w-full" onkeyup="formatRupiahInput(this, 'selling_price')" required>
+            <input type="hidden" name="selling_price" id="selling_price" required>
+        </div>
+
+        <input type="number" name="stock" placeholder="Stok" class="border rounded-lg p-2" required>
+        <input type="number" name="minimum_stock" placeholder="Stok Minimum" class="border rounded-lg p-2" value="10" required>
+        <input type="number" name="maximum_stock" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
+        <div class="col-span-2">
+            <input type="file" name="image" class="border rounded-lg p-2 w-full">
+            <p class="text-xs text-gray-500 mt-1">Ukuran maksimal 2MB (jpg, jpeg, png, webp)</p>
+        </div>
+        <div class="col-span-2">
+            <textarea name="description" class="border rounded-lg p-2 w-full" placeholder="Deskripsi (opsional)"></textarea>
+        </div>
+    </div>
             <div class="flex justify-end gap-2 mt-6">
                 <button type="button" onclick="closeModal()" class="border px-4 py-2 rounded-lg">Batal</button>
                 <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Simpan Barang</button>
@@ -405,6 +418,12 @@
     function openModal() {
         // Isi field kode dengan kode terbaru
         document.getElementById('product_code').value = nextCode;
+        // Reset input harga & display
+        document.getElementById('purchase_price_display').value = '';
+        document.getElementById('purchase_price').value = '';
+        document.getElementById('selling_price_display').value = '';
+        document.getElementById('selling_price').value = '';
+
         // Tampilkan modal
         document.getElementById('productModal').classList.remove('hidden');
         document.getElementById('productModal').classList.add('flex');
@@ -451,8 +470,17 @@
             document.getElementById('edit_name').value = data.name;
             document.getElementById('edit_category').value = data.category || '';
             document.getElementById('edit_unit').value = data.unit;
-            document.getElementById('edit_purchase_price').value = data.purchase_price;
-            document.getElementById('edit_selling_price').value = data.selling_price;
+            
+            // Set harga beli (Hidden Input & Formatted Display Input)
+            const purchasePrice = parseInt(data.purchase_price) || 0;
+            document.getElementById('edit_purchase_price').value = purchasePrice;
+            document.getElementById('edit_purchase_price_display').value = purchasePrice ? new Intl.NumberFormat('id-ID').format(purchasePrice) : '';
+
+            // Set harga jual (Hidden Input & Formatted Display Input)
+            const sellingPrice = parseInt(data.selling_price) || 0;
+            document.getElementById('edit_selling_price').value = sellingPrice;
+            document.getElementById('edit_selling_price_display').value = sellingPrice ? new Intl.NumberFormat('id-ID').format(sellingPrice) : '';
+
             document.getElementById('edit_stock').value = data.stock;
             document.getElementById('edit_minimum_stock').value = data.minimum_stock;
             document.getElementById('edit_maximum_stock').value = data.maximum_stock;
@@ -485,6 +513,22 @@
     function closeFilterModal() {
         document.getElementById('filterModal').classList.remove('flex');
         document.getElementById('filterModal').classList.add('hidden');
+    }
+
+    // Helper Fungsi Format Rupiah Real-time
+    function formatRupiahInput(input, hiddenInputId) {
+        // Ambil angka saja
+        let rawValue = input.value.replace(/[^0-9]/g, '');
+        
+        // Simpan angka murni ke hidden input (untuk dikirim ke controller/database)
+        document.getElementById(hiddenInputId).value = rawValue;
+
+        // Tampilkan dengan format ribuan (titik) di layar
+        if (rawValue) {
+            input.value = new Intl.NumberFormat('id-ID').format(rawValue);
+        } else {
+            input.value = '';
+        }
     }
 </script>
 
