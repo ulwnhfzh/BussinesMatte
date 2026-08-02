@@ -320,8 +320,21 @@
                 <input type="text" name="name" id="edit_name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
                 <input type="text" name="category" id="edit_category" placeholder="Kategori" class="border rounded-lg p-2">
                 <input type="text" name="unit" id="edit_unit" class="border rounded-lg p-2">
-                <input type="number" name="purchase_price" id="edit_purchase_price" placeholder="Harga Beli" class="border rounded-lg p-2" required>
-                <input type="number" name="selling_price" id="edit_selling_price" placeholder="Harga Jual" class="border rounded-lg p-2" required>
+                
+                <!-- HARGA BELI EDIT (Diperbaiki) -->
+                <div class="relative flex items-center">
+                    <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
+                    <input type="text" id="edit_purchase_price_display" placeholder="Harga Beli" class="border rounded-lg p-2 pl-10 w-full" onkeyup="formatRupiahInput(this, 'edit_purchase_price')" required>
+                    <input type="hidden" name="purchase_price" id="edit_purchase_price" required>
+                </div>
+
+                <!-- HARGA JUAL EDIT (Diperbaiki) -->
+                <div class="relative flex items-center">
+                    <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
+                    <input type="text" id="edit_selling_price_display" placeholder="Harga Jual" class="border rounded-lg p-2 pl-10 w-full" onkeyup="formatRupiahInput(this, 'edit_selling_price')" required>
+                    <input type="hidden" name="selling_price" id="edit_selling_price" required>
+                </div>
+
                 <input type="number" name="stock" id="edit_stock" placeholder="Stok" class="border rounded-lg p-2" required>
                 <input type="number" name="minimum_stock" id="edit_minimum_stock" placeholder="Stok Minimum" class="border rounded-lg p-2" required>
                 <input type="number" name="maximum_stock" id="edit_maximum_stock" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
@@ -418,20 +431,23 @@
     function openModal() {
         // Isi field kode dengan kode terbaru
         document.getElementById('product_code').value = nextCode;
-        // Reset input harga & display
+        
+        // Reset input harga display dan hidden input murni
         document.getElementById('purchase_price_display').value = '';
         document.getElementById('purchase_price').value = '';
         document.getElementById('selling_price_display').value = '';
         document.getElementById('selling_price').value = '';
 
         // Tampilkan modal
-        document.getElementById('productModal').classList.remove('hidden');
-        document.getElementById('productModal').classList.add('flex');
+        const modal = document.getElementById('productModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
     }
 
     function closeModal() {
-        document.getElementById('productModal').classList.remove('flex');
-        document.getElementById('productModal').classList.add('hidden');
+        const modal = document.getElementById('productModal');
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
     }
 
     // Generate kode baru dengan memanggil endpoint
@@ -440,7 +456,7 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById('product_code').value = data.code;
-                nextCode = data.code; // simpan untuk digunakan lagi
+                nextCode = data.code; // Simpan untuk digunakan lagi
             })
             .catch(error => {
                 alert('Gagal generate kode, silakan coba lagi.');
@@ -517,13 +533,16 @@
 
     // Helper Fungsi Format Rupiah Real-time
     function formatRupiahInput(input, hiddenInputId) {
-        // Ambil angka saja
+        // Ambil angka murni saja
         let rawValue = input.value.replace(/[^0-9]/g, '');
         
         // Simpan angka murni ke hidden input (untuk dikirim ke controller/database)
-        document.getElementById(hiddenInputId).value = rawValue;
+        const targetElement = document.getElementById(hiddenInputId);
+        if (targetElement) {
+            targetElement.value = rawValue;
+        }
 
-        // Tampilkan dengan format ribuan (titik) di layar
+        // Tampilkan dengan format ribuan di layar
         if (rawValue) {
             input.value = new Intl.NumberFormat('id-ID').format(rawValue);
         } else {

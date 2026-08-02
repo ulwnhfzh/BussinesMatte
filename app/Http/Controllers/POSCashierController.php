@@ -19,18 +19,18 @@ class POSCashierController extends Controller
     {
         $businessId = Auth::user()->business_id;
 
-        // Ambil produk riil dari database milik business yang login
+        // Ambil produk milik business yang sedang login
         $products = Product::where('business_id', $businessId)->get();
 
         $cart = Session::get('cart', []);
 
-        // Hitung Subtotal Keranjang
+        // Hitung Subtotal Keranjang menggunakan 'selling_price'
         $subtotal = 0;
         foreach ($cart as $item) {
-            $subtotal += $item['price'] * $item['quantity'];
+            $subtotal += $item['selling_price'] * $item['quantity'];
         }
 
-        // Kalkulasi Tambahan (Bisa disesuaikan nanti)
+        // Kalkulasi Tambahan
         $tax = $subtotal * 0.11; // Pajak 11%
         $discount = 0; // Diskon default
         $total = $subtotal + $tax - $discount;
@@ -38,6 +38,7 @@ class POSCashierController extends Controller
         return view('pos-cashier.index', compact('products', 'cart', 'subtotal', 'tax', 'discount', 'total'));
     }
 
+    /**
     /**
      * Tambah Produk ke Keranjang
      */
@@ -47,11 +48,10 @@ class POSCashierController extends Controller
         $quantity = $request->quantity ?? 1;
         $note = $request->note ?? '';
 
-        // Ambil produk dari database
         $product = Product::where('business_id', Auth::user()->business_id)
             ->findOrFail($productId);
 
-        // Cek ketersediaan stok
+        // Cek stok inventori
         if ($product->stock < $quantity) {
             return back()->with('error', 'Stok produk tidak mencukupi!');
         }
@@ -70,14 +70,16 @@ class POSCashierController extends Controller
                 $cart[$productId]['note'] = $note;
             }
         } else {
+            // PERBAIKAN: Simpan murni nama file dari DB ($product->image) tanpa asset()
             $cart[$productId] = [
-                'id' => $product->id,
-                'name' => $product->name,
-                'price' => $product->selling_price,
-                'purchase_price' => $product->purchase_price, // Disimpan untuk kalkulasi laba nanti
-                'quantity' => $quantity,
-                'image' => $product->image ? asset('storage/products/' . $product->image) : null,
-                'note' => $note
+                'id'             => $product->id,
+                'name'           => $product->name,
+                'selling_price'  => $product->selling_price,
+                'purchase_price' => $product->purchase_price,
+                'stock'          => $product->stock,
+                'quantity'       => $quantity,
+                'image'          => $product->image, 
+                'note'           => $note
             ];
         }
 
@@ -87,28 +89,28 @@ class POSCashierController extends Controller
     }
 
     /**
-     * Update Jumlah Item di Keranjang
+     * Update Jumlah Item di Keranjang (Tombol + / -)
      */
     public function updateCart(Request $request)
     {
         $productId = $request->product_id;
-        $quantity = $request->quantity;
-        $note = $request->note ?? '';
+        $change = (int) $request->quantity; // bernilai +1 atau -1 dari Blade Form
 
         $cart = Session::get('cart', []);
 
         if (isset($cart[$productId])) {
-            if ($quantity <= 0) {
+            $product = Product::where('business_id', Auth::user()->business_id)->find($productId);
+            $newQuantity = $cart[$productId]['quantity'] + $change;
+
+            if ($newQuantity <= 0) {
                 unset($cart[$productId]);
             } else {
-                $product = Product::where('business_id', Auth::user()->business_id)->find($productId);
-                if ($product && $product->stock < $quantity) {
+                if ($product && $product->stock < $newQuantity) {
                     return back()->with('error', 'Jumlah melebihi stok yang tersedia!');
                 }
-
-                $cart[$productId]['quantity'] = $quantity;
-                $cart[$productId]['note'] = $note;
+                $cart[$productId]['quantity'] = $newQuantity;
             }
+
             Session::put('cart', $cart);
         }
 
@@ -154,21 +156,19 @@ class POSCashierController extends Controller
         DB::beginTransaction();
 
         try {
-            // 1. Hitung total amount dan modal/HPP
             $subtotal = 0;
             $totalCost = 0;
 
             foreach ($cart as $item) {
-                $subtotal += $item['price'] * $item['quantity'];
+                $subtotal += $item['selling_price'] * $item['quantity'];
                 $totalCost += ($item['purchase_price'] ?? 0) * $item['quantity'];
             }
 
             $tax = $subtotal * 0.11;
             $discount = 0;
             $totalAmount = $subtotal + $tax - $discount;
-            $totalProfit = $totalAmount - $totalCost; // Profit bersih
+            $totalProfit = $totalAmount - $totalCost;
 
-            // 2. Buat Record Transaksi Utama
             $invoiceNumber = 'TRX-' . date('Ymd') . '-' . rand(1000, 9999);
 
             $transaction = Transaction::create([
@@ -184,28 +184,30 @@ class POSCashierController extends Controller
                 'payment_method' => $request->payment_method ?? 'cash',
             ]);
 
-            // 3. Simpan Detail Transaksi & Potong Stok Produk
             foreach ($cart as $productId => $item) {
+                // Pengaman Stok Aktual di Database
+                $product = Product::lockForUpdate()->find($productId);
+                
+                if (!$product || $product->stock < $item['quantity']) {
+                    throw new \Exception("Stok produk '{$item['name']}' tidak mencukupi!");
+                }
+
                 TransactionDetail::create([
                     'transaction_id' => $transaction->id,
                     'product_id'     => $productId,
                     'quantity'       => $item['quantity'],
                     'purchase_price' => $item['purchase_price'] ?? 0,
-                    'selling_price'  => $item['price'],
-                    'subtotal'       => $item['price'] * $item['quantity'],
+                    'selling_price'  => $item['selling_price'],
+                    'subtotal'       => $item['selling_price'] * $item['quantity'],
                     'note'           => $item['note'] ?? null,
                 ]);
 
-                // Potong stok di tabel products
-                $product = Product::find($productId);
-                if ($product) {
-                    $product->decrement('stock', $item['quantity']);
-                }
+                // Potong stok inventori
+                $product->decrement('stock', $item['quantity']);
             }
 
             DB::commit();
 
-            // Dikosongkan keranjang setelah checkout berhasil
             Session::forget('cart');
 
             return redirect()->route('pos.cashier')->with('success', 'Transaksi ' . $invoiceNumber . ' Berhasil Disimpan!');

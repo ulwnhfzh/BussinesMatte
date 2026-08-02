@@ -69,7 +69,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <!-- Product List - 3 kolom dari 5 -->
+        <!-- Product List -->
         <div class="lg:col-span-3">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div class="flex items-center justify-between mb-4">
@@ -80,23 +80,39 @@
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2">
                     @foreach($products as $product)
-                    <div class="pos-product-card border border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300" 
-                         data-product-id="{{ $product['id'] }}"
-                         onclick="addToCart({{ $product['id'] }})">
+                    <div class="pos-product-card border border-gray-100 rounded-xl p-4 {{ $product->stock > 0 ? 'cursor-pointer hover:border-blue-300' : 'opacity-50 cursor-not-allowed bg-gray-50' }}" 
+                         data-product-id="{{ $product->id }}"
+                         @if($product->stock > 0) onclick="addToCart({{ $product->id }})" @endif>
                         <div class="flex items-start gap-3">
-                            <img src="{{ $product['image'] }}" alt="{{ $product['name'] }}" 
+                            <img src="{{ $product->image ? asset('storage/products/' . $product->image) : 'https://via.placeholder.com/60' }}" 
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/60';" 
+                                 alt="{{ $product->name }}" 
                                  class="w-14 h-14 rounded-lg object-cover flex-shrink-0">
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-bold text-gray-800 text-sm truncate">{{ $product['name'] }}</h4>
-                                <p class="text-[10px] text-gray-400">{{ $product['category'] }}</p>
-                                <p class="text-[10px] text-gray-400">Stok: {{ $product['stock'] }}</p>
-                                <p class="text-sm font-bold text-blue-600 mt-1">Rp {{ number_format($product['price'], 0, ',', '.') }}</p>
+                                <h4 class="font-bold text-gray-800 text-sm truncate" title="{{ $product->name }}">{{ $product->name }}</h4>
+                                <p class="text-[10px] text-gray-400">{{ $product->category }}</p>
+                                <p class="text-[10px] text-gray-400">Stok: {{ $product->stock }}</p>
+                                <p class="text-sm font-bold text-blue-600 mt-1">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</p>
                             </div>
                         </div>
-                        <div class="mt-2 flex items-center gap-2">
-                            <span class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                                @if($product['stock'] > 50) Tersedia @elseif($product['stock'] > 10) Stok Terbatas @else Hampir Habis @endif
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-medium 
+                                @if($product->stock > 10) bg-green-100 text-green-700 
+                                @elseif($product->stock > 0) bg-yellow-100 text-yellow-700 
+                                @else bg-red-100 text-red-700 @endif">
+                                @if($product->stock > 10) Tersedia 
+                                @elseif($product->stock > 0) Stok Terbatas 
+                                @else Habis @endif
                             </span>
+
+                            @if($product->stock > 0)
+                            <button type="button" 
+                                    onclick="event.stopPropagation(); addToCart({{ $product->id }});" 
+                                    class="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center text-xs shadow-sm transition-transform active:scale-95"
+                                    title="Tambah ke Keranjang">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            @endif
                         </div>
                     </div>
                     @endforeach
@@ -104,7 +120,7 @@
             </div>
         </div>
 
-        <!-- Cart - 2 kolom dari 5 -->
+        <!-- Cart Section -->
         <div class="lg:col-span-2">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-[600px]">
                 <div class="flex items-center justify-between mb-4">
@@ -126,21 +142,33 @@
                     @foreach($cart as $id => $item)
                     <div class="cart-item-enter border border-gray-100 rounded-xl p-3 hover:shadow-sm transition">
                         <div class="flex gap-3">
-                            <img src="{{ $item['image'] ?? 'https://via.placeholder.com/50x50/cccccc/ffffff?text=?' }}" 
-                                 alt="{{ $item['name'] }}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+                            <!-- PERBAIKAN LOGIKA GAMBAR KERANJANG -->
+                            @php
+                                $cartImg = $item['image'] ?? null;
+                                if ($cartImg) {
+                                    $cartImgUrl = str_starts_with($cartImg, 'http') ? $cartImg : asset('storage/products/' . $cartImg);
+                                } else {
+                                    $cartImgUrl = 'https://via.placeholder.com/50';
+                                }
+                            @endphp
+                            <img src="{{ $cartImgUrl }}" 
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/50';" 
+                                 alt="{{ $item['name'] }}" 
+                                 class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-start justify-between gap-2">
-                                    <p class="font-bold text-gray-800 text-sm truncate">{{ $item['name'] }}</p>
+                                    <p class="font-bold text-gray-800 text-sm truncate" title="{{ $item['name'] }}">{{ $item['name'] }}</p>
                                     <button onclick="removeFromCart({{ $id }})" class="text-gray-400 hover:text-red-500 transition text-xs">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
-                                <p class="text-xs text-gray-500">Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                <p class="text-xs text-gray-500">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</p>
                                 <div class="flex items-center gap-2 mt-1">
                                     <button onclick="updateQuantity({{ $id }}, -1)" class="quantity-btn minus text-sm">−</button>
                                     <span class="font-bold text-sm w-8 text-center">{{ $item['quantity'] }}</span>
                                     <button onclick="updateQuantity({{ $id }}, 1)" class="quantity-btn text-sm">+</button>
-                                    <span class="text-xs text-gray-400 ml-1">= Rp {{ number_format($item['price'] * $item['quantity'], 0, ',', '.') }}</span>
+                                    <span class="text-xs text-gray-400 ml-1">= Rp {{ number_format($item['selling_price'] * $item['quantity'], 0, ',', '.') }}</span>
                                 </div>
                                 @if(!empty($item['note']))
                                 <p class="text-[10px] text-gray-400 italic mt-1">📝 {{ $item['note'] }}</p>
@@ -171,23 +199,17 @@
                         <span class="font-bold text-blue-600 text-xl">Rp {{ number_format($total ?? 0, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex gap-3 mt-3">
-                        <button onclick="saveTransaction()" class="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition">
-                            <i class="fas fa-save mr-2"></i>Simpan
-                        </button>
                         <button onclick="processCheckout()" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-bold hover:bg-blue-700 transition">
                             <i class="fas fa-credit-card mr-2"></i>Bayar Sekarang
                         </button>
                     </div>
-                    <p class="text-center text-[10px] text-gray-400 mt-2">
-                        <i class="fas fa-user-circle mr-1"></i>Budi Santoso • Store Manager
-                    </p>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Form Hidden untuk Action -->
+<!-- Form Hidden -->
 <form id="addForm" method="POST" action="{{ route('pos.add') }}" style="display:none;">
     @csrf
     <input type="hidden" name="product_id" id="addProductId">
@@ -198,7 +220,6 @@
     @csrf
     <input type="hidden" name="product_id" id="updateProductId">
     <input type="hidden" name="quantity" id="updateQuantity">
-    <input type="hidden" name="note" id="updateNote">
 </form>
 
 <form id="removeForm" method="POST" action="{{ route('pos.remove', ['id' => 0]) }}" style="display:none;">
@@ -214,10 +235,6 @@
     @csrf
 </form>
 
-<form id="saveForm" method="POST" action="{{ route('pos.checkout') }}" style="display:none;">
-    @csrf
-</form>
-
 <script>
     function addToCart(productId) {
         document.getElementById('addProductId').value = productId;
@@ -225,18 +242,6 @@
     }
 
     function updateQuantity(productId, change) {
-        // Cari elemen cart item dan ambil quantity saat ini
-        const cartItems = document.querySelectorAll('.cart-item-enter');
-        let currentQty = 0;
-        cartItems.forEach(item => {
-            const qtySpan = item.querySelector('span.font-bold.w-8');
-            if (qtySpan) {
-                currentQty = parseInt(qtySpan.textContent);
-            }
-        });
-
-        // Karena kita tidak bisa mendapatkan quantity per item secara langsung,
-        // kita kirim ke server untuk update
         document.getElementById('updateProductId').value = productId;
         document.getElementById('updateQuantity').value = change;
         document.getElementById('updateForm').submit();
@@ -265,18 +270,7 @@
         }
     }
 
-    function saveTransaction() {
-        const cartItems = document.querySelectorAll('.cart-item-enter');
-        if (cartItems.length === 0) {
-            alert('Keranjang kosong! Tambahkan produk terlebih dahulu.');
-            return;
-        }
-        if (confirm('Simpan transaksi?')) {
-            document.getElementById('saveForm').submit();
-        }
-    }
-
-    // Search produk
+    // Live Search Produk
     document.getElementById('searchProduct')?.addEventListener('keyup', function() {
         const search = this.value.toLowerCase();
         const products = document.querySelectorAll('.pos-product-card');
@@ -292,7 +286,7 @@
     });
 </script>
 
-<!-- Toast Notification -->
+<!-- Toast Notifications -->
 @if(session('success'))
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -330,5 +324,4 @@
         }, 3000);
     }
 </script>
-
 @endsection
