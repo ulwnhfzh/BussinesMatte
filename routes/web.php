@@ -18,40 +18,52 @@ use Illuminate\Support\Facades\Route;
 */
 
 // ==========================================
-// 1. HALAMAN UTAMA (REDIRECT)
+// 1. HALAMAN UTAMA
 // ==========================================
 Route::get('/', function () {
     return redirect('/login');
 });
 
 // ==========================================
-// 2. ROUTE UNTUK GUEST (BELUM LOGIN)
+// 2. ROUTE GUEST
 // ==========================================
 Route::middleware('guest')->group(function () {
+
     // Login
-    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::get('/login', [LoginController::class, 'showLoginForm'])
+        ->name('login');
+
     Route::post('/login', [LoginController::class, 'login']);
 
     // Register
-    Route::get('/register', [RegisterController::class, 'showRegisterForm'])->name('register');
+    Route::get('/register', [RegisterController::class, 'showRegisterForm'])
+        ->name('register');
+
     Route::post('/register', [RegisterController::class, 'register']);
 
     // Lupa Password
-    Route::get('/forgot-password', [ForgotPasswordController::class, 'showForgotForm'])->name('password.request');
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])->name('password.email');
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'showForgotForm'])
+        ->name('password.request');
+
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink'])
+        ->name('password.email');
 
     // Reset Password
-    Route::get('/reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
-    Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name('password.update');
+    Route::get('/reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])
+        ->name('password.reset');
+
+    Route::post('/reset-password', [ResetPasswordController::class, 'reset'])
+        ->name('password.update');
 });
 
 // ==========================================
-// 3. ROUTE UNTUK USER YANG SUDAH LOGIN (AUTH)
+// 3. ROUTE USER YANG SUDAH LOGIN
 // ==========================================
 Route::middleware('auth')->group(function () {
 
     // Logout
-    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+    Route::post('/logout', [LoginController::class, 'logout'])
+        ->name('logout');
 
     // ================================
     // A. DASHBOARD
@@ -67,46 +79,99 @@ Route::middleware('auth')->group(function () {
     // ================================
     // B. MANAJEMEN INVENTARIS
     // ================================
-    Route::get('/inventory', [ProductController::class, 'index'])->name('inventory');
-    Route::post('/inventory', [ProductController::class, 'store'])->name('inventory.store');
-    Route::get('/inventory/{id}/edit', [ProductController::class, 'edit'])->name('inventory.edit'); // <-- TAMBAHKAN INI
-    Route::get('/inventory/{id}', [ProductController::class, 'show'])->name('inventory.detail');
-    Route::put('/inventory/{id}', [ProductController::class, 'update'])->name('inventory.update');
-    Route::delete('/inventory/{id}', [ProductController::class, 'destroy'])->name('inventory.destroy');
+
+    // Route utama inventory
+    Route::get('/inventory', [ProductController::class, 'index'])
+        ->name('inventory');
+
+    Route::post('/inventory', [ProductController::class, 'store'])
+        ->name('inventory.store');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Route inventory statis
+    |--------------------------------------------------------------------------
+    | Route ini wajib diletakkan sebelum /inventory/{id}.
+    */
+
+    Route::get('/inventory/generate-code', [ProductController::class, 'generateCodeAjax'])
+        ->name('inventory.generate');
+
+    Route::get('/inventory/prediction', [ProductController::class, 'getPrediction'])
+        ->name('inventory.prediction');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Route inventory dinamis
+    |--------------------------------------------------------------------------
+    | whereNumber memastikan {id} hanya menerima angka.
+    */
+
+    Route::get('/inventory/{id}/edit', [ProductController::class, 'edit'])
+        ->whereNumber('id')
+        ->name('inventory.edit');
+
+    Route::get('/inventory/{id}', [ProductController::class, 'show'])
+        ->whereNumber('id')
+        ->name('inventory.detail');
+
+    Route::put('/inventory/{id}', [ProductController::class, 'update'])
+        ->whereNumber('id')
+        ->name('inventory.update');
+
+    Route::delete('/inventory/{id}', [ProductController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('inventory.destroy');
 
     // ================================
     // C. ANALYTICS
     // ================================
-    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
-    Route::get('/analytics/chart-data', [AnalyticsController::class, 'getChartData'])->name('analytics.chart');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])
+        ->name('analytics');
+
+    Route::get('/analytics/chart-data', [AnalyticsController::class, 'getChartData'])
+        ->name('analytics.chart');
 
     // ================================
     // D. AI COPILOT
     // ================================
-    Route::get('/ai-copilot', [AICopilotController::class, 'index'])->name('ai.copilot');
+    Route::get('/ai-copilot', [AICopilotController::class, 'index'])
+        ->name('ai.copilot');
 
     // ================================
     // E. POS CASHIER
     // ================================
-    Route::get('/pos-cashier', [POSCashierController::class, 'index'])->name('pos.cashier');
-    Route::post('/pos/add', [POSCashierController::class, 'addToCart'])->name('pos.add');
-    Route::post('/pos/update', [POSCashierController::class, 'updateCart'])->name('pos.update');
-    Route::delete('/pos/remove/{id}', [POSCashierController::class, 'removeFromCart'])->name('pos.remove');
-    Route::post('/pos/clear', [POSCashierController::class, 'clearCart'])->name('pos.clear');
-    Route::post('/pos/checkout', [POSCashierController::class, 'checkout'])->name('pos.checkout');
-    Route::post('/pos/save', [POSCashierController::class, 'checkout'])->name('pos.save');
+    Route::get('/pos-cashier', [POSCashierController::class, 'index'])
+        ->name('pos.cashier');
+
+    Route::post('/pos/add', [POSCashierController::class, 'addToCart'])
+        ->name('pos.add');
+
+    Route::post('/pos/update', [POSCashierController::class, 'updateCart'])
+        ->name('pos.update');
+
+    Route::delete('/pos/remove/{id}', [POSCashierController::class, 'removeFromCart'])
+        ->whereNumber('id')
+        ->name('pos.remove');
+
+    Route::post('/pos/clear', [POSCashierController::class, 'clearCart'])
+        ->name('pos.clear');
+
+    Route::post('/pos/checkout', [POSCashierController::class, 'checkout'])
+        ->name('pos.checkout');
+
+    Route::post('/pos/save', [POSCashierController::class, 'checkout'])
+        ->name('pos.save');
 
     // ================================
     // F. PENGATURAN
     // ================================
-    Route::get('/pengaturan', [PengaturanController::class, 'index'])->name('pengaturan');
-    Route::put('/pengaturan/update', [PengaturanController::class, 'updateProfile'])->name('pengaturan.update');
-    Route::put('/pengaturan/password', [PengaturanController::class, 'updatePassword'])->name('pengaturan.password');
+    Route::get('/pengaturan', [PengaturanController::class, 'index'])
+        ->name('pengaturan');
 
+    Route::put('/pengaturan/update', [PengaturanController::class, 'updateProfile'])
+        ->name('pengaturan.update');
 
-    // ================================
-    // G. GENERATE KODE BARANG (AJAX)
-    // ================================
-    Route::get('/inventory/generate-code', [ProductController::class, 'generateCodeAjax'])->name('inventory.generate');
-
+    Route::put('/pengaturan/password', [PengaturanController::class, 'updatePassword'])
+        ->name('pengaturan.password');
 });

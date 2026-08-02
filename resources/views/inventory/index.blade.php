@@ -1,15 +1,45 @@
 @extends('layouts.app')
 
+{{-- Versi inventory dengan sidebar AI dan gambar produk terintegrasi --}}
+
 @section('title', 'Manajemen Inventori - UsahaMate')
 
 @section('content')
+{{-- Notifikasi validasi gagal --}}
+@if ($errors->any())
+    <div
+        class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4"
+        role="alert"
+    >
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 text-red-600">
+                ⚠️
+            </div>
+
+            <div>
+                <h3 class="text-sm font-bold text-red-800">
+                    Data barang gagal disimpan
+                </h3>
+
+                <ul class="mt-2 list-disc list-inside space-y-1">
+                    @foreach ($errors->all() as $error)
+                        <li class="text-sm text-red-700">
+                            {{ $error }}
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    </div>
+@endif
+
 <div class="flex flex-col lg:flex-row gap-6 w-full">
-    
+
     <!-- ========================================== -->
     <!-- KOLOM KIRI (TABEL INVENTORI)                -->
     <!-- ========================================== -->
     <div class="flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        
+
         <!-- Header Halaman -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
@@ -37,10 +67,10 @@
         <!-- ===== FORM PENCARIAN ===== -->
         <form action="{{ route('inventory') }}" method="GET" class="mb-6 flex flex-wrap gap-2">
             <div class="relative flex-1 min-w-[200px]">
-                <input 
-                    type="text" 
-                    name="search" 
-                    placeholder="Cari produk berdasarkan nama, kode, atau kategori..." 
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Cari produk berdasarkan nama, kode, atau kategori..."
                     value="{{ request('search') }}"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 pl-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
@@ -54,12 +84,12 @@
 
         <!-- Filter Kategori (chip) -->
         <div class="flex flex-wrap gap-2 mb-6">
-            <a href="{{ route('inventory', array_merge(request()->except('category'), ['search' => request('search')])) }}" 
+            <a href="{{ route('inventory', array_merge(request()->except('category'), ['search' => request('search')])) }}"
                class="px-4 py-1.5 rounded-full text-xs font-medium {{ !request('category') ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }} transition">
                 Semua Item
             </a>
             @foreach($categories as $cat)
-                <a href="{{ route('inventory', array_merge(request()->except('category'), ['category' => $cat, 'search' => request('search')])) }}" 
+                <a href="{{ route('inventory', array_merge(request()->except('category'), ['category' => $cat, 'search' => request('search')])) }}"
                    class="px-4 py-1.5 rounded-full text-xs font-medium {{ request('category') == $cat ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }} transition">
                     {{ $cat }}
                 </a>
@@ -116,21 +146,36 @@
                                 <div class="text-xs text-gray-900 font-medium mb-1">
                                     Kapasitas <span class="text-blue-600">{{ $product->stock }}</span> / {{ max($product->maximum_stock,1) }}
                                 </div>
-                                <div class="w-24 h-1.5 bg-gray-200 rounded-full">
-                                    <div class="h-1.5 rounded-full {{ $product->status == 'kritis' ? 'bg-red-500' : 'bg-blue-600' }}" 
-                                         style="width: {{ ($product->stock / max($product->maximum_stock,1))*100 }}%"></div>
-                                </div>
+                                <div class="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+    <div
+        class="h-1.5 rounded-full
+            {{ $product->status === 'kritis'
+                ? 'bg-red-500'
+                : ($product->status === 'peringatan'
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500') }}"
+        style="width: {{
+            min(
+                100,
+                max(
+                    0,
+                    ($product->stock / max($product->maximum_stock, 1)) * 100
+                )
+            )
+        }}%">
+    </div>
+</div>
                             </div>
                         </td>
 
                         <!-- Minimum Stok -->
                         <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">
-                            {{ $product->minimum_stock }} Unit
+                            {{ $product->minimum_stock }} {{ $product->unit }}
                         </td>
 
                         <!-- Maksimum Stok -->
                         <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">
-                            {{ $product->maximum_stock }} Unit
+                            {{ $product->maximum_stock }} {{ $product->unit }}
                         </td>
 
                         <!-- Harga Jual -->
@@ -145,7 +190,7 @@
                             @elseif($product->status == 'kritis')
                                 <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-red-100 text-red-700 border border-red-200">Kritis</span>
                             @else
-                                <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200">Peringatan</span>
+                                <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200">Peringatan</span>
                             @endif
                         </td>
 
@@ -185,69 +230,129 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- KOLOM KANAN (PREDIKSI AI & REKOMENDASI)     -->
+    <!-- KOLOM KANAN: INVENTORY & AI ASSISTANT     -->
     <!-- ========================================== -->
     <div class="w-full lg:w-[340px] flex flex-col gap-4">
-        <!-- Kartu 1: Prediksi Minggu Depan -->
+        <!-- Ringkasan kondisi seluruh inventory -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div class="flex items-center justify-between mb-1">
-                <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Permintaan Minggu Depan</div>
-            </div>
-            <div class="text-2xl font-bold text-gray-800 mb-1">+18%</div>
-            <div class="text-[11px] text-green-600 font-medium flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                vs minggu lalu
-            </div>
-        </div>
-
-        <!-- Kartu 2: Rekomendasi Restok -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex-1">
-            <h4 class="text-sm font-bold text-gray-800 mb-5">Rekomendasi Restok</h4>
-            <div class="space-y-4 pb-5 border-b border-gray-100 mb-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        </div>
-                        <span class="text-sm font-medium text-gray-700">OmniWatch S7</span>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-blue-600">+120 unit</p>
-                        <p class="text-[11px] text-gray-400">est. $8,400</p>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        </div>
-                        <span class="text-sm font-medium text-gray-700">Nexus V Pro</span>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-blue-600">+45 unit</p>
-                        <p class="text-[11px] text-gray-400">est. $6,250</p>
-                    </div>
-                </div>
-            </div>
             <div class="flex items-center justify-between mb-4">
-                <span class="text-sm text-gray-500 font-medium">Estimasi Total Biaya</span>
-                <span class="text-lg font-bold text-gray-800">$14,650</span>
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800">Ringkasan Inventory</h3>
+                    <p class="text-xs text-gray-400 mt-1">Kondisi seluruh produk bisnis Anda</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">📦</div>
             </div>
-            <a href="#" class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-3 rounded-xl transition duration-200 shadow-sm">
-                Buat Pesanan Pembelian
-            </a>
+
+            <div class="grid grid-cols-3 gap-2">
+                <div class="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
+                    <p class="text-xl font-bold text-gray-800">{{ $totalProducts }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Total</p>
+                </div>
+
+                <div class="rounded-xl bg-red-50 border border-red-100 p-3 text-center">
+                    <p class="text-xl font-bold text-red-600">{{ $criticalProductsCount }}</p>
+                    <p class="text-[10px] text-red-500 mt-1">Kritis</p>
+                </div>
+
+                <div class="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+                    <p class="text-xl font-bold text-amber-600">{{ $overstockProductsCount }}</p>
+                    <p class="text-[10px] text-amber-600 mt-1">Berlebih</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Kartu 3: Tip Optimalisasi -->
+        <!-- Forecast AI -->
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 shadow-sm text-white overflow-hidden relative">
+            <div class="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-white/10"></div>
+
+            <div class="relative">
+                <div class="flex items-start justify-between gap-3 mb-5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">✨</span>
+                            <h3 class="text-sm font-bold">Asisten AI Inventory</h3>
+                        </div>
+                        <p id="ai-service-text" class="text-[11px] text-blue-100 mt-1">
+                            Menghubungkan service prediksi...
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onclick="loadInventoryPrediction()"
+                        class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                        title="Muat ulang prediksi"
+                    >
+                        ↻
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <span id="ai-service-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-[10px] font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse"></span>
+                        Memuat
+                    </span>
+                    <span id="ai-mode-badge" class="px-2.5 py-1 rounded-full bg-white/15 text-[10px] font-semibold">
+                        Menunggu data
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="rounded-xl bg-white/10 border border-white/10 p-3">
+                        <p class="text-[10px] text-blue-100">Permintaan 7 Hari</p>
+                        <p class="mt-1">
+                            <span id="ai-predicted-total" class="text-2xl font-bold">—</span>
+                            <span class="text-xs text-blue-100">unit</span>
+                        </p>
+                    </div>
+
+                    <div class="rounded-xl bg-white/10 border border-white/10 p-3">
+                        <p class="text-[10px] text-blue-100">Dibanding Minggu Lalu</p>
+                        <p id="ai-percentage" class="text-2xl font-bold mt-1">—</p>
+                    </div>
+                </div>
+
+                <p id="ai-summary" class="text-[11px] leading-relaxed text-blue-100 mt-4">
+                    Prediksi sedang dihitung dari histori penjualan bisnis Anda.
+                </p>
+            </div>
+        </div>
+
+        <!-- Rekomendasi restok dari hasil prediksi -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex-1">
+            <div class="flex items-start justify-between gap-3 mb-5">
+                <div>
+                    <h4 class="text-sm font-bold text-gray-800">Rekomendasi Restok AI</h4>
+                    <p class="text-[11px] text-gray-400 mt-1">Forecast + safety stock, dibatasi stok maksimum</p>
+                </div>
+                <span id="ai-restock-count" class="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-bold">—</span>
+            </div>
+
+            <div id="ai-restock-list" class="space-y-4 pb-5 border-b border-gray-100 mb-4">
+                <div class="py-6 text-center">
+                    <div class="w-8 h-8 mx-auto rounded-full border-2 border-blue-100 border-t-blue-600 animate-spin"></div>
+                    <p class="text-xs text-gray-400 mt-3">Memuat rekomendasi...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-sm text-gray-500 font-medium">Estimasi Total Biaya</span>
+                <span id="ai-restock-cost" class="text-lg font-bold text-gray-800 text-right">Rp 0</span>
+            </div>
+        </div>
+
+        <!-- Tip optimalisasi dinamis -->
         <div class="bg-gray-50 rounded-2xl p-5 border border-gray-200">
             <div class="flex items-center gap-2 mb-2">
-                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-sm">💡</div>
+                <div>
+                    <h4 class="text-sm font-bold text-gray-800">Tip Optimalisasi</h4>
+                    <p id="ai-tip-source" class="text-[10px] text-gray-400">Menunggu hasil analisis</p>
                 </div>
-                <h4 class="text-base font-bold text-gray-800">Tip Optimalisasi</h4>
             </div>
-            <p class="text-sm text-gray-600 leading-relaxed">
-                Mengurangi stok OmniWatch sebesar 15% selama musim puncak dapat meningkatkan arus kas sebesar $12rb.
+
+            <p id="ai-optimization-tip" class="text-sm text-gray-600 leading-relaxed">
+                Asisten sedang membaca kondisi stok dan histori penjualan bisnis Anda.
             </p>
         </div>
     </div>
@@ -272,7 +377,7 @@
         <input type="text" name="name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
         <input type="text" name="category" placeholder="Kategori" class="border rounded-lg p-2">
         <input type="text" name="unit" value="Pcs" class="border rounded-lg p-2">
-        
+
         <!-- HARGA BELI (Disesuaikan) -->
         <div class="relative flex items-center">
             <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
@@ -287,9 +392,9 @@
             <input type="hidden" name="selling_price" id="selling_price" required>
         </div>
 
-        <input type="number" name="stock" placeholder="Stok" class="border rounded-lg p-2" required>
-        <input type="number" name="minimum_stock" placeholder="Stok Minimum" class="border rounded-lg p-2" value="10" required>
-        <input type="number" name="maximum_stock" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
+        <input type="number" name="stock" min="0" placeholder="Stok" class="border rounded-lg p-2" required>
+        <input type="number" name="minimum_stock" min="0" placeholder="Stok Minimum" class="border rounded-lg p-2" value="10" required>
+        <input type="number" name="maximum_stock" min="1" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
         <div class="col-span-2">
             <input type="file" name="image" class="border rounded-lg p-2 w-full">
             <p class="text-xs text-gray-500 mt-1">Ukuran maksimal 2MB (jpg, jpeg, png, webp)</p>
@@ -320,7 +425,7 @@
                 <input type="text" name="name" id="edit_name" placeholder="Nama Barang" class="border rounded-lg p-2" required>
                 <input type="text" name="category" id="edit_category" placeholder="Kategori" class="border rounded-lg p-2">
                 <input type="text" name="unit" id="edit_unit" class="border rounded-lg p-2">
-                
+
                 <!-- HARGA BELI EDIT (Diperbaiki) -->
                 <div class="relative flex items-center">
                     <span class="absolute left-3 text-gray-500 text-sm font-semibold">Rp</span>
@@ -335,9 +440,9 @@
                     <input type="hidden" name="selling_price" id="edit_selling_price" required>
                 </div>
 
-                <input type="number" name="stock" id="edit_stock" placeholder="Stok" class="border rounded-lg p-2" required>
-                <input type="number" name="minimum_stock" id="edit_minimum_stock" placeholder="Stok Minimum" class="border rounded-lg p-2" required>
-                <input type="number" name="maximum_stock" id="edit_maximum_stock" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
+                <input type="number" name="stock" id="edit_stock" min="0" placeholder="Stok" class="border rounded-lg p-2" required>
+                <input type="number" name="minimum_stock" id="edit_minimum_stock" min="0" placeholder="Stok Minimum" class="border rounded-lg p-2" required>
+                <input type="number" name="maximum_stock" id="edit_maximum_stock" min="1" placeholder="Stok Maksimum" class="border rounded-lg p-2" required>
                 <div class="col-span-2">
                     <input type="file" name="image" class="border rounded-lg p-2 w-full">
                     <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ingin mengubah gambar (maks 2MB)</p>
@@ -431,7 +536,7 @@
     function openModal() {
         // Isi field kode dengan kode terbaru
         document.getElementById('product_code').value = nextCode;
-        
+
         // Reset input harga display dan hidden input murni
         document.getElementById('purchase_price_display').value = '';
         document.getElementById('purchase_price').value = '';
@@ -486,7 +591,7 @@
             document.getElementById('edit_name').value = data.name;
             document.getElementById('edit_category').value = data.category || '';
             document.getElementById('edit_unit').value = data.unit;
-            
+
             // Set harga beli (Hidden Input & Formatted Display Input)
             const purchasePrice = parseInt(data.purchase_price) || 0;
             document.getElementById('edit_purchase_price').value = purchasePrice;
@@ -535,7 +640,7 @@
     function formatRupiahInput(input, hiddenInputId) {
         // Ambil angka murni saja
         let rawValue = input.value.replace(/[^0-9]/g, '');
-        
+
         // Simpan angka murni ke hidden input (untuk dikirim ke controller/database)
         const targetElement = document.getElementById(hiddenInputId);
         if (targetElement) {
@@ -548,6 +653,347 @@
         } else {
             input.value = '';
         }
+    }
+
+    // =========================================================
+    // AI INVENTORY ASSISTANT
+    // =========================================================
+    const inventoryPredictionUrl = @json(route('inventory.prediction'));
+    const inventoryDetailUrlTemplate = @json(
+        route('inventory.detail', ['id' => '__PRODUCT_ID__'])
+    );
+
+    let inventoryPredictionIsLoading = false;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadInventoryPrediction();
+    });
+
+    async function loadInventoryPrediction() {
+        if (inventoryPredictionIsLoading) {
+            return;
+        }
+
+        inventoryPredictionIsLoading = true;
+        setInventoryPredictionLoadingState();
+
+        try {
+            const response = await fetch(inventoryPredictionUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const prediction = await response.json();
+            renderInventoryPrediction(prediction);
+        } catch (error) {
+            console.error('Gagal memuat prediksi inventory:', error);
+            renderInventoryPredictionError();
+        } finally {
+            inventoryPredictionIsLoading = false;
+        }
+    }
+
+    function setInventoryPredictionLoadingState() {
+        document.getElementById('ai-service-text').textContent =
+            'Menghitung prediksi terbaru...';
+
+        document.getElementById('ai-service-badge').innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse"></span>
+            Memuat
+        `;
+    }
+
+    function renderInventoryPrediction(prediction) {
+        renderInventoryServiceStatus(prediction);
+
+        document.getElementById('ai-mode-badge').textContent =
+            prediction.mode_label || 'Belum Ada Prediksi';
+
+        document.getElementById('ai-predicted-total').textContent =
+            formatInteger(prediction.predicted_total);
+
+        document.getElementById('ai-percentage').textContent =
+            formatPercentage(prediction.percentage);
+
+        document.getElementById('ai-summary').textContent =
+            prediction.summary || 'Belum ada ringkasan prediksi.';
+
+        const products = Array.isArray(prediction.products)
+            ? prediction.products
+            : [];
+
+        renderInventoryRestock(products);
+        renderInventoryOptimizationTip(prediction, products);
+    }
+
+    function renderInventoryServiceStatus(prediction) {
+        const serviceBadge = document.getElementById('ai-service-badge');
+        const serviceText = document.getElementById('ai-service-text');
+
+        if (prediction.service_status === 'online') {
+            serviceBadge.innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+                AI Online
+            `;
+            serviceText.textContent =
+                prediction.service_message || 'Service AI terhubung.';
+            return;
+        }
+
+        if (prediction.service_status === 'fallback') {
+            serviceBadge.innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>
+                Mode Fallback
+            `;
+            serviceText.textContent =
+                prediction.service_message || 'Menggunakan Moving Average lokal.';
+            return;
+        }
+
+        serviceBadge.innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+            Belum Ada Data
+        `;
+        serviceText.textContent =
+            prediction.service_message || 'Data belum mencukupi untuk dianalisis.';
+    }
+
+    function renderInventoryRestock(products) {
+        const restockList = document.getElementById('ai-restock-list');
+
+        const recommendations = products
+            .filter(product => Number(product.recommended_restock) > 0)
+            .sort(
+                (firstProduct, secondProduct) =>
+                    Number(secondProduct.recommended_restock)
+                    - Number(firstProduct.recommended_restock)
+            );
+
+        const totalCost = recommendations.reduce(
+            (total, product) => total + Number(product.estimated_cost || 0),
+            0
+        );
+
+        document.getElementById('ai-restock-count').textContent =
+            `${recommendations.length} produk`;
+
+        document.getElementById('ai-restock-cost').textContent =
+            formatRupiah(totalCost);
+
+        if (recommendations.length === 0) {
+            restockList.innerHTML = `
+                <div class="py-6 text-center">
+                    <div class="w-12 h-12 mx-auto rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl mb-3">✓</div>
+                    <p class="text-sm font-semibold text-emerald-700">Belum perlu restok</p>
+                    <p class="text-xs text-gray-400 mt-1">Stok mencukupi forecast tujuh hari.</p>
+                </div>
+            `;
+            return;
+        }
+
+        restockList.innerHTML = recommendations
+            .slice(0, 4)
+            .map(product => {
+                const detailUrl = inventoryDetailUrlTemplate.replace(
+                    '__PRODUCT_ID__',
+                    encodeURIComponent(product.product_id)
+                );
+
+                return `
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-3 min-w-0">
+                            ${renderInventoryProductImage(product)}
+
+                            <div class="min-w-0">
+                                <a
+                                    href="${detailUrl}"
+                                    class="block text-sm font-semibold text-gray-700 hover:text-blue-600 truncate"
+                                >
+                                    ${escapeHtml(product.product_name || 'Produk')}
+                                </a>
+
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-semibold">
+                                        ${escapeHtml(product.method_label || 'Belum Ada Prediksi')}
+                                    </span>
+                                    <span class="text-[10px] text-gray-400">
+                                        Forecast ${formatInteger(product.predicted_quantity)} ${escapeHtml(product.unit || 'unit')}
+                                    </span>
+                                </div>
+
+                                <p class="text-[10px] text-gray-400 mt-1 leading-relaxed">
+                                    ${escapeHtml(product.method_reason || product.reason || '')}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="text-right flex-shrink-0">
+                            <p class="text-sm font-bold text-blue-600">
+                                +${formatInteger(product.recommended_restock)} ${escapeHtml(product.unit || 'unit')}
+                            </p>
+                            <p class="text-[11px] text-gray-400 mt-0.5">
+                                ${formatRupiah(product.estimated_cost)}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            })
+            .join('');
+    }
+
+    function renderInventoryOptimizationTip(prediction, products) {
+        const tipElement = document.getElementById('ai-optimization-tip');
+        const sourceElement = document.getElementById('ai-tip-source');
+
+        const recommendations = products.filter(
+            product => Number(product.recommended_restock) > 0
+        );
+
+        const noDataProducts = products.filter(
+            product => product.method === 'no_data'
+        );
+
+        const overstockProducts = products.filter(
+            product => Number(product.current_stock)
+                > Number(product.maximum_stock)
+        );
+
+        sourceElement.textContent = `Mode: ${
+            prediction.mode_label || 'Belum Ada Prediksi'
+        }`;
+
+        if (prediction.service_status === 'fallback') {
+            tipElement.textContent =
+                'Service AI sedang tidak tersedia. Prediksi tetap berjalan dengan Moving Average; nyalakan kembali service Python untuk menguji Random Forest.';
+            return;
+        }
+
+        if (recommendations.length > 0) {
+            const productNames = recommendations
+                .slice(0, 2)
+                .map(product => product.product_name)
+                .join(' dan ');
+
+            tipElement.textContent =
+                `Prioritaskan restok ${productNames}. Jumlah rekomendasi sudah mempertimbangkan forecast, stok minimum, dan kapasitas stok maksimum.`;
+            return;
+        }
+
+        if (overstockProducts.length > 0) {
+            tipElement.textContent =
+                `Terdapat ${overstockProducts.length} produk melebihi stok maksimum. Pertimbangkan promosi atau bundling agar perputaran stok lebih cepat.`;
+            return;
+        }
+
+        if (noDataProducts.length > 0) {
+            tipElement.textContent =
+                `Terdapat ${noDataProducts.length} produk tanpa histori penjualan. Lakukan transaksi melalui POS agar rekomendasinya mulai terbentuk.`;
+            return;
+        }
+
+        tipElement.textContent =
+            'Stok saat ini mencukupi forecast tujuh hari. Pantau kembali setelah ada transaksi baru agar rekomendasi tetap sesuai kondisi terbaru.';
+    }
+
+    function renderInventoryProductImage(product) {
+        const productName = escapeHtml(
+            product.product_name || 'Produk'
+        );
+
+        if (!product.image_url) {
+            return `
+                <div class="w-10 h-10 flex-shrink-0 rounded-xl bg-blue-100 flex items-center justify-center text-base">
+                    📦
+                </div>
+            `;
+        }
+
+        return `
+            <div class="w-10 h-10 flex-shrink-0 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative">
+                <img
+                    src="${escapeHtml(product.image_url)}"
+                    alt="${productName}"
+                    class="w-full h-full object-cover"
+                    onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden'); this.nextElementSibling.classList.add('flex');"
+                >
+                <div class="hidden absolute inset-0 items-center justify-center text-base bg-blue-100">
+                    📦
+                </div>
+            </div>
+        `;
+    }
+
+    function renderInventoryPredictionError() {
+        document.getElementById('ai-service-badge').innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full bg-red-300"></span>
+            Gagal Memuat
+        `;
+
+        document.getElementById('ai-service-text').textContent =
+            'Endpoint prediksi tidak dapat dibaca.';
+
+        document.getElementById('ai-mode-badge').textContent =
+            'Tidak tersedia';
+
+        document.getElementById('ai-predicted-total').textContent = '—';
+        document.getElementById('ai-percentage').textContent = '—';
+        document.getElementById('ai-summary').textContent =
+            'Periksa koneksi Laravel dan service Python, lalu tekan tombol muat ulang.';
+
+        document.getElementById('ai-restock-count').textContent = '0 produk';
+        document.getElementById('ai-restock-cost').textContent = 'Rp 0';
+        document.getElementById('ai-restock-list').innerHTML = `
+            <div class="py-6 text-center text-sm text-red-500">
+                Rekomendasi belum dapat dimuat.
+            </div>
+        `;
+
+        document.getElementById('ai-tip-source').textContent =
+            'Analisis tidak tersedia';
+        document.getElementById('ai-optimization-tip').textContent =
+            'Muat ulang setelah endpoint prediksi kembali tersedia.';
+    }
+
+    function formatInteger(value) {
+        const number = Number(value || 0);
+        return new Intl.NumberFormat('id-ID', {
+            maximumFractionDigits: 0
+        }).format(number);
+    }
+
+    function formatRupiah(value) {
+        const number = Number(value || 0);
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            maximumFractionDigits: 0
+        }).format(number);
+    }
+
+    function formatPercentage(value) {
+        if (value === null || value === undefined || value === '') {
+            return 'Belum ada';
+        }
+
+        const number = Number(value);
+        const sign = number > 0 ? '+' : '';
+        return `${sign}${new Intl.NumberFormat('id-ID', {
+            maximumFractionDigits: 1
+        }).format(number)}%`;
+    }
+
+    function escapeHtml(value) {
+        const temporaryElement = document.createElement('div');
+        temporaryElement.textContent = String(value ?? '');
+        return temporaryElement.innerHTML;
     }
 </script>
 

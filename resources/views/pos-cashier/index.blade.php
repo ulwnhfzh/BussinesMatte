@@ -80,13 +80,13 @@
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2">
                     @foreach($products as $product)
-                    <div class="pos-product-card border border-gray-100 rounded-xl p-4 {{ $product->stock > 0 ? 'cursor-pointer hover:border-blue-300' : 'opacity-50 cursor-not-allowed bg-gray-50' }}" 
+                    <div class="pos-product-card border border-gray-100 rounded-xl p-4 {{ $product->stock > 0 ? 'cursor-pointer hover:border-blue-300' : 'opacity-50 cursor-not-allowed bg-gray-50' }}"
                          data-product-id="{{ $product->id }}"
                          @if($product->stock > 0) onclick="addToCart({{ $product->id }})" @endif>
                         <div class="flex items-start gap-3">
-                            <img src="{{ $product->image ? asset('storage/products/' . $product->image) : 'https://via.placeholder.com/60' }}" 
-                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/60';" 
-                                 alt="{{ $product->name }}" 
+                            <img src="{{ $product->image ? asset('storage/products/' . $product->image) : 'https://via.placeholder.com/60' }}"
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/60';"
+                                 alt="{{ $product->name }}"
                                  class="w-14 h-14 rounded-lg object-cover flex-shrink-0">
                             <div class="flex-1 min-w-0">
                                 <h4 class="font-bold text-gray-800 text-sm truncate" title="{{ $product->name }}">{{ $product->name }}</h4>
@@ -96,18 +96,18 @@
                             </div>
                         </div>
                         <div class="mt-3 flex items-center justify-between">
-                            <span class="text-[10px] px-2 py-0.5 rounded-full font-medium 
-                                @if($product->stock > 10) bg-green-100 text-green-700 
-                                @elseif($product->stock > 0) bg-yellow-100 text-yellow-700 
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-medium
+                                @if($product->stock > 10) bg-green-100 text-green-700
+                                @elseif($product->stock > 0) bg-yellow-100 text-yellow-700
                                 @else bg-red-100 text-red-700 @endif">
-                                @if($product->stock > 10) Tersedia 
-                                @elseif($product->stock > 0) Stok Terbatas 
+                                @if($product->stock > 10) Tersedia
+                                @elseif($product->stock > 0) Stok Terbatas
                                 @else Habis @endif
                             </span>
 
                             @if($product->stock > 0)
-                            <button type="button" 
-                                    onclick="event.stopPropagation(); addToCart({{ $product->id }});" 
+                            <button type="button"
+                                    onclick="event.stopPropagation(); addToCart({{ $product->id }});"
                                     class="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center text-xs shadow-sm transition-transform active:scale-95"
                                     title="Tambah ke Keranjang">
                                 <i class="fas fa-plus"></i>
@@ -151,9 +151,9 @@
                                     $cartImgUrl = 'https://via.placeholder.com/50';
                                 }
                             @endphp
-                            <img src="{{ $cartImgUrl }}" 
-                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/50';" 
-                                 alt="{{ $item['name'] }}" 
+                            <img src="{{ $cartImgUrl }}"
+                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/50';"
+                                 alt="{{ $item['name'] }}"
                                  class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
 
                             <div class="flex-1 min-w-0">

@@ -78,7 +78,7 @@ class POSCashierController extends Controller
                 'purchase_price' => $product->purchase_price,
                 'stock'          => $product->stock,
                 'quantity'       => $quantity,
-                'image'          => $product->image, 
+                'image'          => $product->image,
                 'note'           => $note
             ];
         }
@@ -187,7 +187,7 @@ class POSCashierController extends Controller
             foreach ($cart as $productId => $item) {
                 // Pengaman Stok Aktual di Database
                 $product = Product::lockForUpdate()->find($productId);
-                
+
                 if (!$product || $product->stock < $item['quantity']) {
                     throw new \Exception("Stok produk '{$item['name']}' tidak mencukupi!");
                 }

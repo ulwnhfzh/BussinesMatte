@@ -17,3 +17,11 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Python AI prediction service
+prediction-service/venv/
+prediction-service/.venv/
+prediction-service/__pycache__/
+prediction-service/**/*.py[cod]
+prediction-service/.pytest_cache/
+prediction-service/*.pkl
