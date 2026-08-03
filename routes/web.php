@@ -176,7 +176,19 @@ Route::delete(
 
     Route::post('/pos/save', [POSCashierController::class, 'checkout'])
         ->name('pos.save');
+    // --- PRIORITAS 2 & 3: RIWAYAT, DETAIL & CETAK STRUK ---
+    Route::get('/pos/transactions', [POSCashierController::class, 'transactionsHistory'])
+        ->name('pos.transactions.index');
 
+    Route::get('/pos/transactions/{id}', [POSCashierController::class, 'transactionDetail'])
+        ->whereNumber('id')
+        ->name('pos.transactions.show');
+
+    Route::get('/pos/transactions/{id}/print', [POSCashierController::class, 'printReceipt'])
+        ->whereNumber('id')
+        ->name('pos.transactions.print');
+    // Tambahkan route ini di routes/web.php
+    Route::get('/pos/history', [POSCashierController::class, 'transactionsHistory'])->name('pos.history');
     // ================================
     // F. PENGATURAN
     // ================================

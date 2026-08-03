@@ -66,8 +66,8 @@
                         AI Copilot
                     </a>
 
-                    <!-- POS CASHIER -->
-                    <a href="{{ route('pos.cashier') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition duration-200 {{ request()->routeIs('pos.cashier') ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50' }}">
+                    <!-- POS CASHIER (Aktif jika di halaman kasir maupun riwayat) -->
+                    <a href="{{ route('pos.cashier') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition duration-200 {{ request()->routeIs('pos*') ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50' }}">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                         POS Cashier
                     </a>
@@ -86,9 +86,9 @@
                     <div class="flex justify-between text-xs mb-1 text-blue-800"><span>Penyimpanan Cloud</span> <span>72%</span></div>
                     <div class="w-full bg-blue-200 rounded-full h-2"><div class="bg-blue-600 h-2 rounded-full" style="width: 72%"></div></div>
                 </div>
-                <button class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:bg-blue-700">
+                <a href="{{ route('pos.cashier') }}" class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:bg-blue-700">
                     <span>+</span> Transaksi Baru
-                </button>
+                </a>
             </div>
         </aside>
 
@@ -126,7 +126,7 @@
                 </div>
             </header>
 
-            <!-- TEMPAT KONTEN DARI HALAMAN LAIN (DASHBOARD / INVENTORY) -->
+            <!-- TEMPAT KONTEN DARI HALAMAN LAIN -->
             <div class="space-y-6 p-6">
                 @yield('content')
             </div>

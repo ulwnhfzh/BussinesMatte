@@ -360,4 +360,73 @@ class POSCashierController extends Controller
                 );
         }
     }
+    /**
+     * Prioritas 2: Menampilkan daftar riwayat transaksi kasir.
+     */
+    public function transactionsHistory(Request $request)
+    {
+        $businessId = Auth::user()->business_id;
+
+        $query = Transaction::with(['user', 'details'])
+            ->where('business_id', $businessId);
+
+        // Filter pencarian invoice / nama kasir
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($u) use ($search) {
+                      $u->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Filter Rentang Tanggal
+        if ($request->filled('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
+        $transactions = $query->latest()->paginate(15)->withQueryString();
+
+        return view('pos-cashier.transactions.index', compact('transactions'));
+    }
+
+    /**
+     * Prioritas 3: Menampilkan detail transaksi.
+     */
+    public function transactionDetail($id)
+    {
+        $businessId = Auth::user()->business_id;
+
+        $transaction = Transaction::with(['user', 'details.product'])
+            ->where('business_id', $businessId)
+            ->findOrFail($id);
+
+        return view('pos-cashier.transactions.show', compact('transaction'));
+    }
+
+    /**
+     * Prioritas 3: Halaman cetak/thermal print struk transaksi.
+     */
+    public function printReceipt($id)
+    {
+        $businessId = Auth::user()->business_id;
+
+        $transaction = Transaction::with(['user', 'details.product'])
+            ->where('business_id', $businessId)
+            ->findOrFail($id);
+
+        return view('pos-cashier.transactions.print', compact('transaction'));
+    }
+    /**
+     * Alias method untuk route pos.history
+     */
+    public function history(Request $request)
+    {
+        return $this->transactionsHistory($request);
+    }
 }
