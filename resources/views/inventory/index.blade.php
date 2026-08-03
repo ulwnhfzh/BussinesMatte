@@ -46,7 +46,28 @@
                 <h2 class="text-2xl font-bold text-gray-800">Manajemen Inventori</h2>
                 <p class="text-sm text-gray-500 mt-1">Kelola tingkat stok Anda dan pantau kesehatan produk secara real-time.</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
+                <a
+                    href="{{ route('inventory.stock-movements') }}"
+                    class="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 flex items-center gap-2 transition"
+                >
+                    <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    </svg>
+
+                    Riwayat Stok
+                </a>
+
                 <button onclick="openModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition">
                     + Tambah Barang
                 </button>

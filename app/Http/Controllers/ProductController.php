@@ -4,13 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Services\PredictionService;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly StockMovementService $stockMovementService
+    ) {
+    }
+
     /**
      * Menampilkan halaman inventory.
      */
@@ -351,22 +358,29 @@ class ProductController extends Controller
                 ->storeAs('products', $imageName, 'public');
         }
 
-        Product::create([
-            // Business ID tidak diambil dari form.
-            'business_id' => Auth::user()->business_id,
+        DB::transaction(function () use ($request, $imageName) {
+            $product = Product::create([
+                // Business ID tidak diambil dari form.
+                'business_id' => Auth::user()->business_id,
 
-            'product_code' => $request->product_code,
-            'name' => $request->name,
-            'category' => $request->category,
-            'purchase_price' => $request->purchase_price,
-            'selling_price' => $request->selling_price,
-            'stock' => $request->stock,
-            'minimum_stock' => $request->minimum_stock,
-            'maximum_stock' => $request->maximum_stock,
-            'unit' => $request->unit,
-            'description' => $request->description,
-            'image' => $imageName,
-        ]);
+                'product_code' => $request->product_code,
+                'name' => $request->name,
+                'category' => $request->category,
+                'purchase_price' => $request->purchase_price,
+                'selling_price' => $request->selling_price,
+                'stock' => $request->stock,
+                'minimum_stock' => $request->minimum_stock,
+                'maximum_stock' => $request->maximum_stock,
+                'unit' => $request->unit,
+                'description' => $request->description,
+                'image' => $imageName,
+            ]);
+
+            $this->stockMovementService->recordInitialStock(
+                $product,
+                'Stok awal saat produk ditambahkan.'
+            );
+        });
 
         return redirect()
             ->route('inventory')
@@ -532,20 +546,38 @@ class ProductController extends Controller
             $product->image = $imageName;
         }
 
-        $product->fill($request->only([
-            'product_code',
-            'name',
-            'category',
-            'purchase_price',
-            'selling_price',
-            'stock',
-            'minimum_stock',
-            'maximum_stock',
-            'unit',
-            'description',
-        ]));
+        $newStock = (int) $request->stock;
 
-        $product->save();
+        DB::transaction(function () use (
+            $request,
+            $product,
+            $newStock
+        ) {
+            /*
+             * Kolom stock tidak diisi langsung melalui fill().
+             * Perubahan stock ditangani StockMovementService agar
+             * nilai sebelum dan sesudah selalu tercatat.
+             */
+            $product->fill($request->only([
+                'product_code',
+                'name',
+                'category',
+                'purchase_price',
+                'selling_price',
+                'minimum_stock',
+                'maximum_stock',
+                'unit',
+                'description',
+            ]));
+
+            $product->save();
+
+            $this->stockMovementService->adjustStock(
+                $product,
+                $newStock,
+                'Penyesuaian stok melalui edit produk.'
+            );
+        });
 
         return back()->with(
             'success',

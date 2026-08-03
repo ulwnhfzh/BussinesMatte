@@ -9,6 +9,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AICopilotController;
 use App\Http\Controllers\POSCashierController;
 use App\Http\Controllers\PengaturanController;
+use App\Http\Controllers\StockMovementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -77,51 +78,64 @@ Route::middleware('auth')->group(function () {
     })->name('dashboard');
 
     // ================================
-    // B. MANAJEMEN INVENTARIS
-    // ================================
+// B. MANAJEMEN INVENTARIS
+// ================================
 
-    // Route utama inventory
-    Route::get('/inventory', [ProductController::class, 'index'])
-        ->name('inventory');
+// Halaman utama dan penyimpanan produk.
+Route::get(
+    '/inventory',
+    [ProductController::class, 'index']
+)->name('inventory');
 
-    Route::post('/inventory', [ProductController::class, 'store'])
-        ->name('inventory.store');
+Route::post(
+    '/inventory',
+    [ProductController::class, 'store']
+)->name('inventory.store');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Route inventory statis
-    |--------------------------------------------------------------------------
-    | Route ini wajib diletakkan sebelum /inventory/{id}.
-    */
+// Route statis harus berada sebelum route /inventory/{id}.
+Route::get(
+    '/inventory/prediction',
+    [ProductController::class, 'getPrediction']
+)->name('inventory.prediction');
 
-    Route::get('/inventory/generate-code', [ProductController::class, 'generateCodeAjax'])
-        ->name('inventory.generate');
+Route::get(
+    '/inventory/generate-code',
+    [ProductController::class, 'generateCodeAjax']
+)->name('inventory.generate');
 
-    Route::get('/inventory/prediction', [ProductController::class, 'getPrediction'])
-        ->name('inventory.prediction');
+Route::get(
+    '/inventory/stock-movements',
+    [StockMovementController::class, 'index']
+)->name('inventory.stock-movements');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Route inventory dinamis
-    |--------------------------------------------------------------------------
-    | whereNumber memastikan {id} hanya menerima angka.
-    */
+// Route dengan parameter ID produk.
+Route::get(
+    '/inventory/{id}/edit',
+    [ProductController::class, 'edit']
+)
+    ->whereNumber('id')
+    ->name('inventory.edit');
 
-    Route::get('/inventory/{id}/edit', [ProductController::class, 'edit'])
-        ->whereNumber('id')
-        ->name('inventory.edit');
+Route::get(
+    '/inventory/{id}',
+    [ProductController::class, 'show']
+)
+    ->whereNumber('id')
+    ->name('inventory.detail');
 
-    Route::get('/inventory/{id}', [ProductController::class, 'show'])
-        ->whereNumber('id')
-        ->name('inventory.detail');
+Route::put(
+    '/inventory/{id}',
+    [ProductController::class, 'update']
+)
+    ->whereNumber('id')
+    ->name('inventory.update');
 
-    Route::put('/inventory/{id}', [ProductController::class, 'update'])
-        ->whereNumber('id')
-        ->name('inventory.update');
-
-    Route::delete('/inventory/{id}', [ProductController::class, 'destroy'])
-        ->whereNumber('id')
-        ->name('inventory.destroy');
+Route::delete(
+    '/inventory/{id}',
+    [ProductController::class, 'destroy']
+)
+    ->whereNumber('id')
+    ->name('inventory.destroy');
 
     // ================================
     // C. ANALYTICS
