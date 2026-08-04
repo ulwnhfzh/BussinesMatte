@@ -228,6 +228,10 @@ class POSCashierController extends Controller
      */
     public function checkout(Request $request)
     {
+        $request->validate([
+            'payment_method' => ['required', 'string', 'in:cash,qris,e-wallet'],
+        ]);
+
         $cart = Session::get('cart', []);
 
         if (empty($cart)) {
@@ -273,7 +277,7 @@ class POSCashierController extends Controller
                 'total_amount' => $totalAmount,
                 'total_cost' => $totalCost,
                 'total_profit' => $totalProfit,
-                'payment_method' => $request->payment_method ?? 'cash',
+                'payment_method' => $request->payment_method,
             ]);
 
             foreach ($cart as $productId => $item) {
