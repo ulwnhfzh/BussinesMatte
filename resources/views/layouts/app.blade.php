@@ -35,9 +35,43 @@
     @endphp
 
     <div class="flex h-screen overflow-hidden">
-        
+
+        <!-- Overlay sidebar khusus mobile -->
+        <div
+            id="mobileSidebarOverlay"
+            class="fixed inset-0 z-40 hidden bg-slate-950/40 backdrop-blur-sm md:hidden"
+            aria-hidden="true"
+        ></div>
+
         <!-- SIDEBAR KIRI -->
-        <aside class="hidden w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-white p-6 md:flex">
+        <aside
+            id="appSidebar"
+            class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white p-6 shadow-2xl transition-transform duration-300 ease-out md:static md:z-auto md:translate-x-0 md:shadow-none"
+            aria-label="Navigasi utama"
+        >
+            <!-- Tombol tutup sidebar khusus mobile -->
+            <button
+                type="button"
+                id="mobileSidebarCloseButton"
+                class="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 md:hidden"
+                aria-label="Tutup menu navigasi"
+            >
+                <svg
+                    class="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                    />
+                </svg>
+            </button>
+
             <div>
                 <!-- Logo Aplikasi UsahaMate -->
                 @php
@@ -111,10 +145,35 @@
         </aside>
 
         <!-- KONTEN UTAMA (KANAN) -->
-        <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+        <main class="flex min-w-0 flex-1 flex-col h-screen overflow-y-auto">
             
             <!-- NAVBAR ATAS -->
             <header class="sticky top-0 z-20 flex items-center justify-end border-b border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur sm:px-6">
+                <!-- Tombol hamburger khusus mobile -->
+                <button
+                    type="button"
+                    id="mobileMenuButton"
+                    class="mr-auto flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 md:hidden"
+                    aria-label="Buka menu navigasi"
+                    aria-controls="appSidebar"
+                    aria-expanded="false"
+                >
+                    <svg
+                        class="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"
+                        />
+                    </svg>
+                </button>
+
                 <!-- Menu profil -->
                 <details class="group relative flex-shrink-0">
                     <summary
@@ -229,7 +288,7 @@
             </header>
 
             <!-- TEMPAT KONTEN DARI HALAMAN LAIN -->
-            <div class="space-y-6 p-6">
+            <div class="space-y-6 p-4 sm:p-6">
                 @yield('content')
             </div>
 
@@ -249,6 +308,68 @@
         @yield('content')
     </div>
     @endguest
+
+    <script>
+        (function () {
+            const sidebar = document.getElementById('appSidebar');
+            const overlay = document.getElementById('mobileSidebarOverlay');
+            const openButton = document.getElementById('mobileMenuButton');
+            const closeButton = document.getElementById(
+                'mobileSidebarCloseButton'
+            );
+
+            if (!sidebar || !overlay || !openButton || !closeButton) {
+                return;
+            }
+
+            function setMobileSidebarState(isOpen) {
+                sidebar.classList.toggle('-translate-x-full', !isOpen);
+                overlay.classList.toggle('hidden', !isOpen);
+                openButton.setAttribute(
+                    'aria-expanded',
+                    isOpen ? 'true' : 'false'
+                );
+                document.body.classList.toggle('overflow-hidden', isOpen);
+            }
+
+            function openMobileSidebar() {
+                setMobileSidebarState(true);
+                closeButton.focus();
+            }
+
+            function closeMobileSidebar() {
+                setMobileSidebarState(false);
+                openButton.focus();
+            }
+
+            openButton.addEventListener('click', openMobileSidebar);
+            closeButton.addEventListener('click', closeMobileSidebar);
+            overlay.addEventListener('click', closeMobileSidebar);
+
+            sidebar.querySelectorAll('a').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    if (window.innerWidth < 768) {
+                        setMobileSidebarState(false);
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (
+                    event.key === 'Escape'
+                    && openButton.getAttribute('aria-expanded') === 'true'
+                ) {
+                    closeMobileSidebar();
+                }
+            });
+
+            window.addEventListener('resize', function () {
+                if (window.innerWidth >= 768) {
+                    setMobileSidebarState(false);
+                }
+            });
+        })();
+    </script>
 
 </body>
 </html>

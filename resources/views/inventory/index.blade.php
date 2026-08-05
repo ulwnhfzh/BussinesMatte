@@ -33,12 +33,12 @@
     </div>
 @endif
 
-<div class="flex flex-col lg:flex-row gap-6 w-full">
+<div class="flex w-full min-w-0 flex-col gap-5 xl:flex-row">
 
     <!-- ========================================== -->
     <!-- KOLOM KIRI (TABEL INVENTORI)                -->
     <!-- ========================================== -->
-    <div class="flex-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div class="min-w-0 flex-1 bg-white rounded-2xl p-4 sm:p-5 xl:p-6 shadow-sm border border-gray-100">
 
         <!-- Header Halaman -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -126,48 +126,57 @@
         </div>
 
         <!-- Tabel Produk -->
-        <div class="border border-gray-200 rounded-xl overflow-x-auto">
-            <table class="w-full text-sm text-left">
+        <div class="w-full min-w-0 overflow-hidden rounded-xl border border-gray-200">
+            <table class="w-full table-fixed text-left text-sm">
+                <colgroup>
+                    <col class="w-[25%]">
+                    <col class="w-[17%]">
+                    <col class="w-[11%]">
+                    <col class="w-[12%]">
+                    <col class="w-[14%]">
+                    <col class="w-[12%]">
+                    <col class="w-[9%]">
+                </colgroup>
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Produk</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Stok Saat Ini</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Minimum Stok</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Maksimum Stok</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Jual</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Status</th>
-                        <th class="px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Aksi</th>
+                        <th class="px-3 py-4 text-[11px] font-medium uppercase tracking-wide text-gray-500">Nama Produk</th>
+                        <th class="px-3 py-4 text-[11px] font-medium uppercase tracking-wide text-gray-500">Stok Saat Ini</th>
+                        <th class="px-3 py-4 text-[11px] font-medium uppercase tracking-wide text-gray-500">Minimum</th>
+                        <th class="px-3 py-4 text-[11px] font-medium uppercase tracking-wide text-gray-500">Maksimum</th>
+                        <th class="px-3 py-4 text-[11px] font-medium uppercase tracking-wide text-gray-500">Harga Jual</th>
+                        <th class="px-3 py-4 text-center text-[11px] font-medium uppercase tracking-wide text-gray-500">Status</th>
+                        <th class="px-2 py-4 text-center text-[11px] font-medium uppercase tracking-wide text-gray-500">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
                     @forelse($products as $product)
                     <tr class="hover:bg-blue-50 transition duration-150">
                         <!-- Nama Produk (link ke detail) -->
-                        <td class="px-6 py-5 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                        <td class="px-3 py-4">
+                            <div class="flex min-w-0 items-center">
+                                <div class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 xl:h-11 xl:w-11">
                                     @if($product->image)
                                         <img src="{{ asset('storage/products/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
                                     @else
                                         <div class="w-full h-full flex items-center justify-center text-lg">📦</div>
                                     @endif
                                 </div>
-                                <div class="ml-4">
-                                    <a href="{{ route('inventory.detail', $product->id) }}" class="text-sm font-semibold text-gray-900 hover:underline">
+                                <div class="ml-3 min-w-0">
+                                    <a href="{{ route('inventory.detail', $product->id) }}" class="block truncate text-sm font-semibold text-gray-900 hover:underline" title="{{ $product->name }}">
                                         {{ $product->name }}
                                     </a>
-                                    <div class="text-xs text-gray-400">SKU: {{ $product->product_code }}</div>
+                                    <div class="truncate text-xs text-gray-400" title="SKU: {{ $product->product_code }}">SKU: {{ $product->product_code }}</div>
                                 </div>
                             </div>
                         </td>
 
                         <!-- Stok Saat Ini (progress bar) -->
-                        <td class="px-6 py-5 whitespace-nowrap">
-                            <div class="flex flex-col">
-                                <div class="text-xs text-gray-900 font-medium mb-1">
-                                    Kapasitas <span class="text-blue-600">{{ $product->stock }}</span> / {{ max($product->maximum_stock,1) }}
+                        <td class="px-3 py-4">
+                            <div class="flex min-w-0 flex-col">
+                                <div class="mb-1 truncate text-[11px] font-medium text-gray-900 xl:text-xs" title="Stok {{ $product->stock }} dari {{ max($product->maximum_stock,1) }}">
+                                    Stok <span class="text-blue-600">{{ $product->stock }}</span> / {{ max($product->maximum_stock,1) }}
                                 </div>
-                                <div class="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div class="h-1.5 w-full max-w-24 overflow-hidden rounded-full bg-gray-200">
     <div
         class="h-1.5 rounded-full
             {{ $product->status === 'kritis'
@@ -190,43 +199,45 @@
                         </td>
 
                         <!-- Minimum Stok -->
-                        <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">
+                        <td class="px-3 py-4 text-xs font-medium text-gray-600 xl:text-sm">
                             {{ $product->minimum_stock }} {{ $product->unit }}
                         </td>
 
                         <!-- Maksimum Stok -->
-                        <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">
+                        <td class="px-3 py-4 text-xs font-medium text-gray-600 xl:text-sm">
                             {{ $product->maximum_stock }} {{ $product->unit }}
                         </td>
 
                         <!-- Harga Jual -->
-                        <td class="px-6 py-5 whitespace-nowrap text-sm font-medium text-gray-800">
+                        <td class="break-words px-3 py-4 text-xs font-medium text-gray-800 xl:text-sm">
                             Rp {{ number_format($product->selling_price, 0, ',', '.') }}
                         </td>
 
                         <!-- Status -->
-                        <td class="px-6 py-5 whitespace-nowrap text-center">
+                        <td class="px-2 py-4 text-center">
                             @if($product->status == 'optimal')
-                                <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Optimal</span>
+                                <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-2 text-[10px] font-bold leading-5 text-emerald-700 xl:px-3 xl:text-[11px]">Optimal</span>
                             @elseif($product->status == 'kritis')
-                                <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-red-100 text-red-700 border border-red-200">Kritis</span>
+                                <span class="inline-flex rounded-full border border-red-200 bg-red-100 px-2 text-[10px] font-bold leading-5 text-red-700 xl:px-3 xl:text-[11px]">Kritis</span>
                             @else
-                                <span class="px-3 inline-flex text-[11px] leading-5 font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200">Peringatan</span>
+                                <span class="inline-flex rounded-full border border-amber-200 bg-amber-100 px-2 text-[10px] font-bold leading-5 text-amber-700 xl:px-3 xl:text-[11px]">Peringatan</span>
                             @endif
                         </td>
 
                         <!-- Aksi -->
-                        <td class="px-6 py-5 whitespace-nowrap text-center">
-                            <button onclick="openEditModal({{ $product->id }})" class="text-blue-600 hover:text-blue-800 mr-2" title="Edit">
-                                <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                            </button>
-                            <form action="{{ route('inventory.destroy', $product->id) }}" method="POST" class="inline" onsubmit="return confirm('Yakin ingin menghapus produk ini?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-red-600 hover:text-red-800" title="Hapus">
-                                    <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        <td class="px-2 py-4 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <button onclick="openEditModal({{ $product->id }})" class="text-blue-600 hover:text-blue-800" title="Edit">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
-                            </form>
+                                <form action="{{ route('inventory.destroy', $product->id) }}" method="POST" class="inline-flex" onsubmit="return confirm('Yakin ingin menghapus produk ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:text-red-800" title="Hapus">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     @empty
@@ -253,7 +264,7 @@
     <!-- ========================================== -->
     <!-- KOLOM KANAN: INVENTORY & AI ASSISTANT     -->
     <!-- ========================================== -->
-    <div class="w-full lg:w-[340px] flex flex-col gap-4">
+    <div class="flex w-full min-w-0 flex-shrink-0 flex-col gap-4 xl:w-[300px] 2xl:w-[320px]">
         <!-- Ringkasan kondisi seluruh inventory -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">

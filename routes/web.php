@@ -10,6 +10,7 @@ use App\Http\Controllers\AICopilotController;
 use App\Http\Controllers\POSCashierController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\StockMovementController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -73,10 +74,8 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('dashboard');
     })->name('home');
 
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->name('dashboard');
     // ================================
 // B. MANAJEMEN INVENTARIS
 // ================================

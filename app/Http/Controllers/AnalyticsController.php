@@ -2,229 +2,471 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
+use App\Services\PredictionService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class AnalyticsController extends Controller
 {
     public function index(Request $request)
     {
-        // ================================================================
-        // 📊 DATA STATISTIK UTAMA
-        // ================================================================
-        // Cara Edit: Ubah nilai di bawah sesuai data bisnis Anda
-        // ================================================================
+        $businessId = (int) Auth::user()->business_id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filter periode
+        |--------------------------------------------------------------------------
+        */
+        $allowedDateRanges = [
+            '7_hari' => 7,
+            '30_hari' => 30,
+            '90_hari' => 90,
+        ];
+
+        $dateRange = $request->get('date_range', '30_hari');
+
+        if (!array_key_exists($dateRange, $allowedDateRanges)) {
+            $dateRange = '30_hari';
+        }
+
+        $periodDays = $allowedDateRanges[$dateRange];
+        $periodEnd = now()->endOfDay();
+        $periodStart = now()
+            ->subDays($periodDays - 1)
+            ->startOfDay();
+
+        // Periode sebelumnya memiliki jumlah hari yang sama.
+        $previousPeriodEnd = $periodStart->copy()->subSecond();
+        $previousPeriodStart = $previousPeriodEnd
+            ->copy()
+            ->subDays($periodDays - 1)
+            ->startOfDay();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Statistik periode aktif
+        |--------------------------------------------------------------------------
+        */
+        $currentSummary = Transaction::where('business_id', $businessId)
+            ->whereBetween('created_at', [$periodStart, $periodEnd])
+            ->selectRaw('
+                COUNT(*) as total_orders,
+                COALESCE(SUM(total_amount), 0) as total_revenue,
+                COALESCE(AVG(total_amount), 0) as avg_order_value,
+                COALESCE(SUM(total_profit), 0) as total_profit
+            ')
+            ->first();
+
+        $previousRevenue = (float) Transaction::where(
+            'business_id',
+            $businessId
+        )
+            ->whereBetween(
+                'created_at',
+                [$previousPeriodStart, $previousPeriodEnd]
+            )
+            ->sum('total_amount');
+
+        $currentRevenue = (float) $currentSummary->total_revenue;
+
+        if ($previousRevenue > 0) {
+            $revenueGrowth = (
+                ($currentRevenue - $previousRevenue) / $previousRevenue
+            ) * 100;
+        } else {
+            // Pertumbuhan dari nilai nol tidak dapat dihitung secara persentase.
+            $revenueGrowth = null;
+        }
+
         $stats = [
-            'total_revenue' => 128450,        // 💰 Total pendapatan (dalam USD)
-            'revenue_growth' => 12.5,         // 📈 Persentase pertumbuhan (%)
-            'total_orders' => 420,            // 📦 Jumlah total transaksi
-            'avg_order_value' => 305.83,      // 💵 Rata-rata nilai transaksi
-            'conversion_rate' => 3.2,         // 🎯 Rasio konversi (%)
+            'total_revenue' => $currentRevenue,
+            'revenue_growth' => $revenueGrowth !== null
+                ? round($revenueGrowth, 1)
+                : null,
+            'total_orders' => (int) $currentSummary->total_orders,
+            'avg_order_value' => (float) $currentSummary->avg_order_value,
+            'total_profit' => (float) $currentSummary->total_profit,
         ];
 
-        // ================================================================
-        // 📊 DISTRIBUSI PENDAPATAN (Pie Chart)
-        // ================================================================
-        // Cara Edit: 
-        // - Tambah/hapus array di dalam $revenueDistribution
-        // - Ubah 'label' sesuai kategori bisnis Anda
-        // - Ubah 'value' sesuai persentase (total harus 100%)
-        // - Ubah 'color' sesuai kode warna HEX yang diinginkan
-        // ================================================================
-        $revenueDistribution = [
-            ['label' => 'Elektronik',   'value' => 60, 'color' => '#2563eb'],
-            ['label' => 'Gaya Hidup',   'value' => 25, 'color' => '#8b5cf6'],
-            ['label' => 'Makanan',      'value' => 10, 'color' => '#22c55e'],  // TAMBAH KATEGORI BARU
-            ['label' => 'Lainnya',      'value' => 5,  'color' => '#f59e0b'],  // UBAH PERSENTASE
+        /*
+        |--------------------------------------------------------------------------
+        | Distribusi pendapatan berdasarkan kategori produk
+        |--------------------------------------------------------------------------
+        */
+        $categoryRevenue = TransactionDetail::query()
+            ->join(
+                'transactions',
+                'transaction_details.transaction_id',
+                '=',
+                'transactions.id'
+            )
+            ->join(
+                'products',
+                'transaction_details.product_id',
+                '=',
+                'products.id'
+            )
+            ->where('transactions.business_id', $businessId)
+            ->where('products.business_id', $businessId)
+            ->whereBetween(
+                'transactions.created_at',
+                [$periodStart, $periodEnd]
+            )
+            ->selectRaw("
+                COALESCE(NULLIF(products.category, ''), 'Tanpa Kategori')
+                    as category_name,
+                SUM(transaction_details.subtotal) as category_revenue
+            ")
+            ->groupBy('category_name')
+            ->orderByDesc('category_revenue')
+            ->get();
+
+        $distributionTotal = (float) $categoryRevenue->sum(
+            'category_revenue'
+        );
+
+        $distributionColors = [
+            '#2563eb',
+            '#8b5cf6',
+            '#22c55e',
+            '#f59e0b',
+            '#ef4444',
+            '#06b6d4',
+            '#64748b',
         ];
 
-        // ================================================================
-        // 🏆 PRODUK PROFITABILITAS (Top 5)
-        // ================================================================
-        // Cara Edit:
-        // - Tambah/hapus array di dalam $topProducts
-        // - Ubah 'name' sesuai nama produk Anda
-        // - Ubah 'profit' sesuai keuntungan (dalam USD)
-        // - Ubah 'margin' sesuai persentase margin (%)
-        // ================================================================
-        $topProducts = [
-            ['name' => 'Quantum Tablet Pro',    'profit' => 12400, 'margin' => 32.5],
-            ['name' => 'Nebula Wireless Hub',   'profit' => 9200,  'margin' => 28.7],
-            ['name' => 'Apex Gaming Mouse',     'profit' => 7800,  'margin' => 25.1],
-            ['name' => 'Crystal Sound Bar',     'profit' => 6500,  'margin' => 22.3], // TAMBAH PRODUK
-            ['name' => 'OmniCharge Power Bank', 'profit' => 5200,  'margin' => 19.8],
-            ['name' => 'UltraBook Pro 15"',     'profit' => 4800,  'margin' => 17.5], // TAMBAH PRODUK
-        ];
+        $revenueDistribution = $categoryRevenue
+            ->map(function ($item, $index) use (
+                $distributionTotal,
+                $distributionColors
+            ) {
+                return [
+                    'label' => $item->category_name,
+                    'revenue' => (float) $item->category_revenue,
+                    'value' => $distributionTotal > 0
+                        ? round(
+                            ((float) $item->category_revenue
+                                / $distributionTotal) * 100,
+                            1
+                        )
+                        : 0,
+                    'color' => $distributionColors[
+                        $index % count($distributionColors)
+                    ],
+                ];
+            })
+            ->values()
+            ->all();
 
-        // ================================================================
-        // 📈 PRAKIRAAN PENJUALAN 7 HARI (AI Forecast)
-        // ================================================================
-        // Cara Edit:
-        // - Tambah/hapus array di dalam $forecast
-        // - Ubah 'day' sesuai hari (Hari Ini, H+1, H+2, dst)
-        // - Ubah 'value' sesuai prediksi nilai penjualan (dalam USD)
-        // - Ubah 'confidence' sesuai tingkat keyakinan (Tinggi/Sedang/Rendah)
-        // ================================================================
-        $forecast = [
-            ['day' => 'Hari Ini',   'value' => 12450, 'confidence' => 'Tinggi'],
-            ['day' => 'H+1',        'value' => 11800, 'confidence' => 'Tinggi'], // TAMBAH HARI
-            ['day' => 'H+2',        'value' => 11200, 'confidence' => 'Sedang'],
-            ['day' => 'H+3',        'value' => 10500, 'confidence' => 'Sedang'], // TAMBAH HARI
-            ['day' => 'H+4',        'value' => 9800,  'confidence' => 'Sedang'],
-            ['day' => 'H+5',        'value' => 9200,  'confidence' => 'Rendah'], // TAMBAH HARI
-            ['day' => 'H+7',        'value' => 13500, 'confidence' => 'Tinggi'],
-        ];
+        // Kategori dengan kontribusi pendapatan terbesar untuk ringkasan kartu.
+        $topRevenueCategory = $revenueDistribution[0] ?? null;
 
-        // ================================================================
-        // 📋 RIWAYAT TRANSAKSI
-        // ================================================================
-        // Cara Edit:
-        // - Tambah/hapus array di dalam $transactions
-        // - Ubah 'id' sesuai format ID transaksi Anda
-        // - Ubah 'customer' sesuai nama pelanggan
-        // - Ubah 'status' (Selesai/Pending/Refund/Batal)
-        // - Ubah 'amount' sesuai nominal (dalam USD)
-        // - Ubah 'method' (Kartu Kredit/PayPal/Transfer Bank/Kredit Toko)
-        // - Ubah 'date' sesuai tanggal transaksi
-        // ================================================================
-        $transactions = [
-            [
-                'id' => '#TX-90421',
-                'customer' => 'Jordan Smith',
-                'status' => 'Selesai',
-                'amount' => 1240.00,
-                'method' => 'Kartu Kredit',
-                'date' => '2024-05-24 14:32'
-            ],
-            [
-                'id' => '#TX-90422',
-                'customer' => 'Maria Banks',
-                'status' => 'Selesai',
-                'amount' => 840.50,
-                'method' => 'PayPal',
-                'date' => '2024-05-24 13:15'
-            ],
-            [
-                'id' => '#TX-90423',
-                'customer' => 'Klien Anonim',
-                'status' => 'Refund',
-                'amount' => 125.00,
-                'method' => 'Kredit Toko',
-                'date' => '2024-05-24 12:45'
-            ],
-            [
-                'id' => '#TX-90424',
-                'customer' => 'Alex Johnson',
-                'status' => 'Selesai',
-                'amount' => 2100.00,
-                'method' => 'Kartu Kredit',
-                'date' => '2024-05-24 11:20'
-            ],
-            [
-                'id' => '#TX-90425',
-                'customer' => 'Sarah Lee',
-                'status' => 'Pending',
-                'amount' => 450.75,
-                'method' => 'Transfer Bank',
-                'date' => '2024-05-24 10:05'
-            ],
-            [
-                'id' => '#TX-90426',
-                'customer' => 'David Kim',
-                'status' => 'Selesai',
-                'amount' => 3200.00,
-                'method' => 'Kartu Kredit',
-                'date' => '2024-05-24 09:30'
-            ],
-            [
-                'id' => '#TX-90427',
-                'customer' => 'Lisa Wong',
-                'status' => 'Selesai',
-                'amount' => 675.25,
-                'method' => 'PayPal',
-                'date' => '2024-05-24 08:55'
-            ],
-            [
-                'id' => '#TX-90428',
-                'customer' => 'Robert Chen',
-                'status' => 'Refund',
-                'amount' => 890.00,
-                'method' => 'Kredit Toko',
-                'date' => '2024-05-24 08:10'
-            ],
-            // TAMBAH TRANSAKSI BARU DI SINI:
-            [
-                'id' => '#TX-90431',
-                'customer' => 'Andi Pratama',
-                'status' => 'Selesai',
-                'amount' => 1550.00,
-                'method' => 'Transfer Bank',
-                'date' => '2024-05-25 09:00'
-            ],
-            [
-                'id' => '#TX-90432',
-                'customer' => 'Siti Rahayu',
-                'status' => 'Pending',
-                'amount' => 2300.00,
-                'method' => 'Kartu Kredit',
-                'date' => '2024-05-25 10:30'
-            ],
-        ];
+        /*
+        |--------------------------------------------------------------------------
+        | Lima produk dengan total laba tertinggi
+        |--------------------------------------------------------------------------
+        */
+        $topProducts = TransactionDetail::query()
+            ->join(
+                'transactions',
+                'transaction_details.transaction_id',
+                '=',
+                'transactions.id'
+            )
+            ->join(
+                'products',
+                'transaction_details.product_id',
+                '=',
+                'products.id'
+            )
+            ->where('transactions.business_id', $businessId)
+            ->where('products.business_id', $businessId)
+            ->whereBetween(
+                'transactions.created_at',
+                [$periodStart, $periodEnd]
+            )
+            ->select([
+                'products.id',
+                'products.name',
+                'products.product_code',
+            ])
+            ->selectRaw(
+                'SUM(transaction_details.subtotal) as revenue'
+            )
+            ->selectRaw('
+                SUM(
+                    (
+                        transaction_details.selling_price
+                        - transaction_details.purchase_price
+                    ) * transaction_details.quantity
+                ) as profit
+            ')
+            ->groupBy([
+                'products.id',
+                'products.name',
+                'products.product_code',
+            ])
+            ->orderByDesc('profit')
+            ->limit(5)
+            ->get()
+            ->map(function ($product) {
+                $revenue = (float) $product->revenue;
+                $profit = (float) $product->profit;
 
-        // ================================================================
-        // 📦 PRODUK UNTUK FILTER
-        // ================================================================
-        // Cara Edit:
-        // - Tambah/hapus array di dalam $productList
-        // - Ubah 'id' sesuai ID produk (unik)
-        // - Ubah 'name' sesuai nama produk
-        // ================================================================
-        $productList = [
-            ['id' => 1, 'name' => 'Quantum Tablet Pro'],
-            ['id' => 2, 'name' => 'Nebula Wireless Hub'],
-            ['id' => 3, 'name' => 'Apex Gaming Mouse'],
-            ['id' => 4, 'name' => 'Crystal Sound Bar'],
-            ['id' => 5, 'name' => 'UltraBook Pro 15"'], // TAMBAH PRODUK
-            ['id' => 6, 'name' => 'SmartWatch X7'],     // TAMBAH PRODUK
-        ];
+                return [
+                    'id' => (int) $product->id,
+                    'name' => $product->name,
+                    'product_code' => $product->product_code,
+                    'revenue' => $revenue,
+                    'profit' => $profit,
+                    'margin' => $revenue > 0
+                        ? round(($profit / $revenue) * 100, 1)
+                        : 0,
+                ];
+            })
+            ->values()
+            ->all();
 
-        // ================================================================
-        // 📊 DATA CHART (untuk API endpoint)
-        // ================================================================
-        // Cara Edit:
-        // - Ubah 'labels' sesuai bulan/tahun yang diinginkan
-        // - Ubah 'values' sesuai data penjualan per bulan
-        // ================================================================
-        $chartData = [
-            'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-            'values' => [42000, 48000, 52000, 61000, 58000, 72000, 68000, 79000, 85000, 92000, 88000, 102000],
-        ];
+        /*
+        |--------------------------------------------------------------------------
+        | Prediksi permintaan produk dari service AI
+        |--------------------------------------------------------------------------
+        */
+        try {
+            $aiPrediction = Cache::remember(
+                'dashboard.ai-prediction.' . $businessId,
+                now()->addMinutes(3),
+                function () {
+                    return (new PredictionService())->getPrediction();
+                }
+            );
+        } catch (Throwable $exception) {
+            report($exception);
 
-        // Ambil parameter filter
-        $dateRange = $request->get('date_range', '30 Hari Terakhir');
-        $category = $request->get('category', 'Semua Kategori');
-        $selectedProducts = $request->get('products', []);
+            $aiPrediction = [
+                'service_status' => 'offline',
+                'service_message' => 'Service AI sedang tidak dapat dihubungi.',
+                'mode' => 'no_data',
+                'mode_label' => 'Belum Ada Prediksi',
+                'summary' => 'Prediksi belum tersedia.',
+                'products' => [],
+            ];
+        }
+
+        $aiServiceStatus = $aiPrediction['service_status'] ?? 'offline';
+        $aiServiceMessage = $aiPrediction['service_message']
+            ?? 'Status service AI belum tersedia.';
+        $aiModeLabel = $aiPrediction['mode_label']
+            ?? 'Belum Ada Prediksi';
+        $aiSummary = $aiPrediction['summary']
+            ?? 'Prediksi belum tersedia.';
+
+        $aiProducts = collect($aiPrediction['products'] ?? []);
+
+        $aiReadyProducts = $aiProducts
+            ->filter(function ($product) {
+                return ($product['method'] ?? 'no_data') !== 'no_data'
+                    || (int) ($product['predicted_quantity'] ?? 0) > 0;
+            });
+
+        $aiAnalyzedProductCount = $aiProducts->count();
+        $aiReadyProductCount = $aiReadyProducts->count();
+        $aiWaitingProductCount = max(
+            0,
+            $aiAnalyzedProductCount - $aiReadyProductCount
+        );
+
+        $aiForecastProducts = $aiReadyProducts
+            ->sortByDesc(function ($product) {
+                return (int) ($product['predicted_quantity'] ?? 0);
+            })
+            ->take(4)
+            ->values();
+
+        $maxForecastQuantity = max(
+            1,
+            (int) $aiForecastProducts->max('predicted_quantity')
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Penjualan terbaru dan riwayat transaksi
+        |--------------------------------------------------------------------------
+        */
+        $transactionSearch = trim(
+            (string) $request->get('search', '')
+        );
+
+        $transactionBaseQuery = Transaction::query()
+            ->leftJoin(
+                'users',
+                'transactions.user_id',
+                '=',
+                'users.id'
+            )
+            ->where('transactions.business_id', $businessId)
+            ->whereBetween(
+                'transactions.created_at',
+                [$periodStart, $periodEnd]
+            )
+            ->select([
+                'transactions.id',
+                'transactions.invoice_number',
+                'transactions.total_amount',
+                'transactions.total_profit',
+                'transactions.payment_method',
+                'transactions.created_at',
+                'users.name as cashier_name',
+            ]);
+
+        $recentSales = (clone $transactionBaseQuery)
+            ->latest('transactions.created_at')
+            ->limit(5)
+            ->get();
+
+        $transactions = (clone $transactionBaseQuery)
+            ->when(
+                $transactionSearch !== '',
+                function ($query) use ($transactionSearch) {
+                    $query->where(function ($searchQuery) use (
+                        $transactionSearch
+                    ) {
+                        $searchQuery
+                            ->where(
+                                'transactions.invoice_number',
+                                'like',
+                                '%' . $transactionSearch . '%'
+                            )
+                            ->orWhere(
+                                'transactions.payment_method',
+                                'like',
+                                '%' . $transactionSearch . '%'
+                            )
+                            ->orWhere(
+                                'users.name',
+                                'like',
+                                '%' . $transactionSearch . '%'
+                            );
+                    });
+                }
+            )
+            ->latest('transactions.created_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        $trendData = $this->buildTrendData(
+            $businessId,
+            $periodStart,
+            $periodEnd,
+            $periodDays
+        );
 
         return view('analytics.index', compact(
             'stats',
             'revenueDistribution',
+            'topRevenueCategory',
             'topProducts',
-            'forecast',
+            'aiServiceStatus',
+            'aiServiceMessage',
+            'aiModeLabel',
+            'aiSummary',
+            'aiForecastProducts',
+            'aiAnalyzedProductCount',
+            'aiReadyProductCount',
+            'aiWaitingProductCount',
+            'maxForecastQuantity',
             'transactions',
-            'productList',
-            'chartData',
+            'recentSales',
+            'transactionSearch',
+            'trendData',
             'dateRange',
-            'category',
-            'selectedProducts'
+            'periodDays',
+            'periodStart',
+            'periodEnd'
         ));
     }
 
-    public function getChartData()
+    public function getChartData(Request $request)
     {
-        // Data untuk chart - bisa diambil dari database atau hardcoded
-        $data = [
-            'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-            'values' => [42000, 48000, 52000, 61000, 58000, 72000, 68000, 79000, 85000, 92000, 88000, 102000],
+        $businessId = (int) Auth::user()->business_id;
+
+        $allowedDateRanges = [
+            '7_hari' => 7,
+            '30_hari' => 30,
+            '90_hari' => 90,
         ];
-        return response()->json($data);
+
+        $dateRange = $request->get('date_range', '30_hari');
+        $periodDays = $allowedDateRanges[$dateRange] ?? 30;
+        $periodEnd = now()->endOfDay();
+        $periodStart = now()
+            ->subDays($periodDays - 1)
+            ->startOfDay();
+
+        return response()->json(
+            $this->buildTrendData(
+                $businessId,
+                $periodStart,
+                $periodEnd,
+                $periodDays
+            )
+        );
+    }
+
+    private function buildTrendData(
+        int $businessId,
+        Carbon $periodStart,
+        Carbon $periodEnd,
+        int $periodDays
+    ): array {
+        $dailyTotals = Transaction::where('business_id', $businessId)
+            ->whereBetween(
+                'created_at',
+                [$periodStart, $periodEnd]
+            )
+            ->selectRaw('
+                DATE(created_at) as transaction_date,
+                SUM(total_amount) as revenue,
+                SUM(total_profit) as profit
+            ')
+            ->groupBy('transaction_date')
+            ->get()
+            ->keyBy('transaction_date');
+
+        $labels = [];
+        $revenue = [];
+        $profit = [];
+        $cursor = $periodStart->copy();
+
+        while ($cursor->lte($periodEnd)) {
+            $dateKey = $cursor->toDateString();
+            $dailyData = $dailyTotals->get($dateKey);
+
+            $labels[] = $periodDays <= 7
+                ? strtoupper(
+                    $cursor->locale('id')->translatedFormat('D')
+                )
+                : $cursor->locale('id')->translatedFormat('d M');
+
+            $revenue[] = $dailyData
+                ? (float) $dailyData->revenue
+                : 0;
+            $profit[] = $dailyData
+                ? (float) $dailyData->profit
+                : 0;
+
+            $cursor->addDay();
+        }
+
+        return [
+            'labels' => $labels,
+            'revenue' => $revenue,
+            'profit' => $profit,
+        ];
     }
 }
