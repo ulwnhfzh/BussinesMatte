@@ -51,9 +51,10 @@
                 <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
                     <tr>
                         <th class="px-6 py-4">Waktu</th>
-                        <th class="px-6 py-4">No. Invoice</th>
+<th class="px-6 py-4">No. Invoice</th>
                         <th class="px-6 py-4">Kasir</th>
                         <th class="px-6 py-4">Metode Bayar</th>
+                        <th class="px-6 py-4">Status</th>
                         <th class="px-6 py-4 text-right">Total Transaksi</th>
                         <th class="px-6 py-4 text-center">Aksi</th>
                     </tr>
@@ -70,9 +71,22 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             {{ $trx->user->name ?? 'Kasir' }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+<td class="px-6 py-4 whitespace-nowrap">
                             <span class="inline-block px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 text-slate-700 uppercase">
                                 {{ $trx->payment_method }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            @php
+                                $statusClass = match ($trx->status) {
+                                    'voided' => 'bg-red-100 text-red-700',
+                                    'refunded' => 'bg-amber-100 text-amber-700',
+                                    'returned' => 'bg-purple-100 text-purple-700',
+                                    default => 'bg-emerald-100 text-emerald-700',
+                                };
+                            @endphp
+                            <span class="inline-block px-2.5 py-1 text-[11px] font-bold rounded-lg {{ $statusClass }}">
+                                {{ $trx->status_label }}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800">
@@ -91,7 +105,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+<td colspan="7" class="px-6 py-8 text-center text-slate-400">
                             Belum ada riwayat transaksi.
                         </td>
                     </tr>

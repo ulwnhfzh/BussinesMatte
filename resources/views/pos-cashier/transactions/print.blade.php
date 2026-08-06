@@ -32,10 +32,16 @@
 
     <div class="line"></div>
 
-    <table style="font-size: 11px;">
+<table style="font-size: 11px;">
         <tr><td>No. Inv</td><td>: {{ $transaction->invoice_number }}</td></tr>
         <tr><td>Tanggal</td><td>: {{ $transaction->created_at->format('d/m/Y H:i') }}</td></tr>
         <tr><td>Kasir</td><td>: {{ $transaction->user->name ?? 'Kasir' }}</td></tr>
+        @if($transaction->status !== 'completed')
+        <tr>
+            <td>Status</td>
+            <td>: {{ strtoupper($transaction->status_label) }}</td>
+        </tr>
+        @endif
     </table>
 
     <div class="line"></div>

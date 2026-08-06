@@ -9,6 +9,18 @@ class Transaction extends Model
 {
     use HasFactory;
 
+    /*
+     * Status transaksi.
+     * - completed : transaksi selesai.
+     * - returned  : seluruh atau sebagian item dikembalikan.
+     * - refunded  : pengembalian dana penuh.
+     * - voided    : transaksi dibatalkan.
+     */
+    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_RETURNED = 'returned';
+    public const STATUS_REFUNDED = 'refunded';
+    public const STATUS_VOIDED = 'voided';
+
     protected $fillable = [
         'business_id',
         'user_id',
@@ -20,6 +32,7 @@ class Transaction extends Model
         'total_cost',
         'total_profit',
         'payment_method',
+        'status',
     ];
 
     public function details()
@@ -30,5 +43,18 @@ class Transaction extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Label status untuk ditampilkan di berbagai halaman.
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            self::STATUS_RETURNED => 'Retur',
+            self::STATUS_REFUNDED => 'Refund',
+            self::STATUS_VOIDED => 'Void',
+            default => 'Selesai',
+        };
     }
 }

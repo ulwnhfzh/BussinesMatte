@@ -187,9 +187,22 @@ Route::post('/ai-copilot/chat', [AICopilotController::class, 'chat'])
         ->whereNumber('id')
         ->name('pos.transactions.show');
 
-    Route::get('/pos/transactions/{id}/print', [POSCashierController::class, 'printReceipt'])
+Route::get('/pos/transactions/{id}/print', [POSCashierController::class, 'printReceipt'])
         ->whereNumber('id')
         ->name('pos.transactions.print');
+
+    // --- PRIORITAS 8: VOID, REFUND & RETUR ---
+    Route::post('/pos/transactions/{id}/void', [POSCashierController::class, 'voidTransaction'])
+        ->whereNumber('id')
+        ->name('pos.transactions.void');
+
+    Route::post('/pos/transactions/{id}/refund', [POSCashierController::class, 'refundTransaction'])
+        ->whereNumber('id')
+        ->name('pos.transactions.refund');
+
+    Route::post('/pos/transactions/{id}/return', [POSCashierController::class, 'returnTransaction'])
+        ->whereNumber('id')
+        ->name('pos.transactions.return');
     // Tambahkan route ini di routes/web.php
     Route::get('/pos/history', [POSCashierController::class, 'transactionsHistory'])->name('pos.history');
     // ================================

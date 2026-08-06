@@ -7,8 +7,10 @@ use App\Models\StockMovement;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Services\StockMovementService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use RuntimeException;
@@ -225,6 +227,9 @@ class POSCashierController extends Controller
 
     /**
      * Memproses checkout dan menyimpan transaksi.
+     *
+     * Dilengkapi proteksi double checkout memakai Cache::lock agar
+     * dua permintaan yang datang bersamaan tidak membuat dua invoice.
      */
     public function checkout(Request $request)
     {
@@ -242,6 +247,23 @@ class POSCashierController extends Controller
 
         $user = Auth::user();
         $businessId = (int) $user->business_id;
+
+        /*
+         * Proteksi double checkout.
+         * Mengunci proses untuk kombinasi bisnis + user agar dua request
+         * yang hampir bersamaan tidak dapat membuat dua invoice sekaligus.
+         * Kunci otomatis lepas setelah 10 detik bila proses macet.
+         */
+        $lock = Cache::lock(
+            'pos-checkout-' . $businessId . '-' . $user->id,
+            10
+        );
+
+        if (! $lock->get()) {
+            return redirect()
+                ->route('pos.cashier')
+                ->with('error', 'Transaksi sedang diproses. Harap tunggu sebentar.');
+        }
 
         DB::beginTransaction();
 
@@ -278,6 +300,7 @@ class POSCashierController extends Controller
                 'total_cost' => $totalCost,
                 'total_profit' => $totalProfit,
                 'payment_method' => $request->payment_method,
+                'status' => Transaction::STATUS_COMPLETED,
             ]);
 
             foreach ($cart as $productId => $item) {
@@ -322,14 +345,9 @@ class POSCashierController extends Controller
                 ]);
 
                 /*
-                 * StockMovementService akan:
-                 * 1. Mengunci produk menggunakan lockForUpdate().
-                 * 2. Memastikan stok tidak menjadi negatif.
-                 * 3. Mengurangi stok.
-                 * 4. Membuat stock movement bertipe sale.
-                 *
-                 * Tidak boleh menggunakan decrement() lagi karena
-                 * service sudah melakukan pengurangan stok.
+                 * StockMovementService akan mengunci produk, memastikan
+                 * stok tidak negatif, mengurangi stok, dan membuat
+                 * stock movement bertipe sale.
                  */
                 $this->stockMovementService->changeStock(
                     product: $product,
@@ -344,6 +362,8 @@ class POSCashierController extends Controller
 
             Session::forget('cart');
 
+            $lock->release();
+
             return redirect()
                 ->route('pos.cashier')
                 ->with(
@@ -355,6 +375,8 @@ class POSCashierController extends Controller
         } catch (Throwable $exception) {
             DB::rollBack();
 
+            $lock->release();
+
             return redirect()
                 ->route('pos.cashier')
                 ->with(
@@ -364,8 +386,9 @@ class POSCashierController extends Controller
                 );
         }
     }
+
     /**
-     * Prioritas 2: Menampilkan daftar riwayat transaksi kasir.
+     * Menampilkan daftar riwayat transaksi kasir.
      */
     public function transactionsHistory(Request $request)
     {
@@ -400,7 +423,7 @@ class POSCashierController extends Controller
     }
 
     /**
-     * Prioritas 3: Menampilkan detail transaksi.
+     * Menampilkan detail transaksi.
      */
     public function transactionDetail($id)
     {
@@ -414,7 +437,7 @@ class POSCashierController extends Controller
     }
 
     /**
-     * Prioritas 3: Halaman cetak/thermal print struk transaksi.
+     * Halaman cetak/thermal print struk transaksi.
      */
     public function printReceipt($id)
     {
@@ -426,8 +449,206 @@ class POSCashierController extends Controller
 
         return view('pos-cashier.transactions.print', compact('transaction'));
     }
+
     /**
-     * Alias method untuk route pos.history
+     * Membatalkan (void) seluruh transaksi.
+     *
+     * Seluruh stok item dikembalikan ke inventory dengan riwayat retur.
+     * Status transaksi diubah menjadi "voided".
+     */
+    public function voidTransaction($id)
+    {
+        $businessId = (int) Auth::user()->business_id;
+
+        $transaction = $this->findEditableTransaction($id, $businessId);
+
+        DB::beginTransaction();
+
+        try {
+            $this->restockTransactionItems($transaction, 'dibatalkan (void)');
+
+            $transaction->update([
+                'status' => Transaction::STATUS_VOIDED,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('success', 'Transaksi ' . $transaction->invoice_number . ' berhasil dibatalkan (void).');
+        } catch (Throwable $exception) {
+            DB::rollBack();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('error', 'Gagal membatalkan transaksi: ' . $exception->getMessage());
+        }
+    }
+
+    /**
+     * Refund penuh: seluruh stok item dikembalikan dan status "refunded".
+     */
+    public function refundTransaction($id)
+    {
+        $businessId = (int) Auth::user()->business_id;
+
+        $transaction = $this->findEditableTransaction($id, $businessId);
+
+        DB::beginTransaction();
+
+        try {
+            $this->restockTransactionItems($transaction, 'di-refund');
+
+            $transaction->update([
+                'status' => Transaction::STATUS_REFUNDED,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('success', 'Transaksi ' . $transaction->invoice_number . ' berhasil di-refund.');
+        } catch (Throwable $exception) {
+            DB::rollBack();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('error', 'Gagal memproses refund: ' . $exception->getMessage());
+        }
+    }
+
+    /**
+     * Retur parsial atau penuh.
+     *
+     * Request wajib berisi array `items` berisi product_id => quantity
+     * yang akan dikembalikan. Stok dikembalikan sesuai jumlah retur.
+     */
+    public function returnTransaction(Request $request, $id)
+    {
+        $businessId = (int) Auth::user()->business_id;
+
+        $transaction = $this->findEditableTransaction($id, $businessId);
+
+        $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.quantity' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+        ]);
+
+        $returnItems = collect($request->input('items', []))
+            ->filter(fn ($entry) => (int) ($entry['quantity'] ?? 0) > 0)
+            ->mapWithKeys(function ($entry, $productId) {
+                return [(int) $productId => (int) $entry['quantity']];
+            });
+
+        if ($returnItems->isEmpty()) {
+            return back()->with('error', 'Tidak ada item yang dipilih untuk retur.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $totalReturned = 0;
+
+            foreach ($transaction->details as $detail) {
+                $returnQuantity = $returnItems->get(
+                    (int) $detail->product_id,
+                    0
+                );
+
+                if ($returnQuantity <= 0) {
+                    continue;
+                }
+
+                if ($returnQuantity > (int) $detail->quantity) {
+                    throw new RuntimeException(
+                        'Jumlah retur melebihi jumlah yang dibeli untuk produk ' . ($detail->product->name ?? '')
+                    );
+                }
+
+                $this->stockMovementService->changeStock(
+                    product: $detail->product,
+                    type: StockMovement::TYPE_RETURN,
+                    quantity: $returnQuantity,
+                    reference: $transaction,
+                    note: 'Retur ' . $returnQuantity . ' dari transaksi ' . $transaction->invoice_number
+                );
+
+                $totalReturned += $returnQuantity;
+            }
+
+            if ($totalReturned <= 0) {
+                throw new RuntimeException('Tidak ada produk valid yang di-retur.');
+            }
+
+            // Retur sebagian item -> tetap status returned.
+            $transaction->update([
+                'status' => Transaction::STATUS_RETURNED,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('success', 'Retur ' . $totalReturned . ' unit berhasil diproses.');
+        } catch (Throwable $exception) {
+            DB::rollBack();
+
+            return redirect()
+                ->route('pos.transactions.show', $transaction->id)
+                ->with('error', 'Gagal memproses retur: ' . $exception->getMessage());
+        }
+    }
+
+    /**
+     * Mengambil transaksi milik bisnis aktif yang masih dapat diubah.
+     */
+    private function findEditableTransaction(int $id, int $businessId): Transaction
+    {
+        $transaction = Transaction::with(['details.product', 'user'])
+            ->where('business_id', $businessId)
+            ->findOrFail($id);
+
+        if ($transaction->status !== Transaction::STATUS_COMPLETED) {
+            throw new RuntimeException(
+                'Transaksi sudah diproses '
+                . $transaction->status_label
+                . ' dan tidak dapat diubah kembali.'
+            );
+        }
+
+        return $transaction;
+    }
+
+    /**
+     * Mengembalikan seluruh stok item transaksi ke produk.
+     */
+    private function restockTransactionItems(
+        Transaction $transaction,
+        string $reason
+    ): void {
+        foreach ($transaction->details as $detail) {
+            $product = $detail->product;
+
+            if (!$product) {
+                continue;
+            }
+
+            $this->stockMovementService->changeStock(
+                product: $product,
+                type: StockMovement::TYPE_RETURN,
+                quantity: (int) $detail->quantity,
+                reference: $transaction,
+                note: 'Stok kembali karena transaksi ' . $reason . ' (' . $transaction->invoice_number . ')'
+            );
+        }
+    }
+
+    /**
+     * Alias method untuk route pos.history.
      */
     public function history(Request $request)
     {

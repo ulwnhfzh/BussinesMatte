@@ -719,8 +719,8 @@
                         <span class="font-bold text-gray-800">Total</span>
                         <span class="font-extrabold text-blue-600 text-xl">Rp {{ number_format($total ?? 0, 0, ',', '.') }}</span>
                     </div>
-                    <div class="pt-2">
-                        <button type="button" onclick="processCheckout()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 transition shadow-md shadow-blue-200">
+<div class="pt-2">
+                        <button type="button" id="checkoutBtn" onclick="processCheckout()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 transition shadow-md shadow-blue-200">
                             <i class="fas fa-credit-card mr-2"></i>Bayar Sekarang
                         </button>
                     </div>
@@ -1167,8 +1167,28 @@
         el.classList.add('selected');
         document.getElementById('ewalletSubmitBtn').disabled = false;
     }
-    // ===== Submit Payment =====
+// ===== Submit Payment =====
+    let paymentSubmitting = false;
+
     function submitPayment(method) {
+        if (paymentSubmitting) {
+            return;
+        }
+
+        paymentSubmitting = true;
+
+        // Disable semua tombol konfirmasi agar mencegah klik ganda.
+        document.querySelectorAll('.payment-submit-btn').forEach(btn => {
+            btn.disabled = true;
+        });
+
+        const checkoutBtn = document.getElementById('checkoutBtn');
+        if (checkoutBtn) {
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerHTML =
+                '<i class="fas fa-spinner fa-spin mr-2"></i> Memproses...';
+        }
+
         let paymentMethod = method;
         if (method === 'e-wallet' && selectedEwallet) {
             paymentMethod = 'e-wallet';
@@ -1176,6 +1196,18 @@
         document.getElementById('paymentMethodInput').value = paymentMethod;
         document.getElementById('checkoutForm').submit();
     }
+    // Cegah resubmit ganda pada form checkout (back/forward cache).
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted && paymentSubmitting) {
+            paymentSubmitting = false;
+            const checkoutBtn = document.getElementById('checkoutBtn');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML =
+                    '<i class="fas fa-credit-card mr-2"></i>Bayar Sekarang';
+            }
+        }
+    });
     // ===== Live Search Produk =====
     document.getElementById('searchProduct')?.addEventListener('input', function() {
         const query = this.value.trim().toLowerCase();
