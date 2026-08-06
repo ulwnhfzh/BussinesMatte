@@ -149,7 +149,10 @@ Route::delete(
     // D. AI COPILOT
     // ================================
     Route::get('/ai-copilot', [AICopilotController::class, 'index'])
-        ->name('ai.copilot');
+    ->name('ai.copilot');
+
+Route::post('/ai-copilot/chat', [AICopilotController::class, 'chat'])
+    ->name('ai.copilot.chat');
 
     // ================================
     // E. POS CASHIER
