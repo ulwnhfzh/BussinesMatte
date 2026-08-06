@@ -11,6 +11,7 @@ use App\Http\Controllers\POSCashierController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -202,4 +203,6 @@ Route::post('/ai-copilot/chat', [AICopilotController::class, 'chat'])
 
     Route::put('/pengaturan/password', [PengaturanController::class, 'updatePassword'])
         ->name('pengaturan.password');
+
+    Route::post('/pengaturan/export-laporan', [ReportExportController::class, 'export'])->name('pengaturan.reports.export');
 });
